@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회원가입 (EJS)</title> <style>
+        body { font-family: sans-serif; display: grid; place-items: center; min-height: 80vh; }
+        form { border: 1px solid #ccc; padding: 20px; border-radius: 8px; }
+        div { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 300px; padding: 8px; }
+        button { width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <form id="registerForm">
+        <h2>회원가입</h2>
+        <div>
+            <label for="email">이메일:</label>
+            <input type="email" id="email" required>
+        </div>
+        <div>
+            <label for="password">비밀번호:</label>
+            <input type="password" id="password" required>
+        </div>
+        <div>
+            <label for="nickname">닉네임:</label>
+            <input type="text" id="nickname">
+        </div>
+        <button type="submit">가입하기</button>
+        <p id="resultMessage" style="color: green;"></p>
+    </form>
+
+    <script>
+        // 이 스크립트는 'register.html'의 스크립트와 100% 동일합니다.
+        // EJS 파일은 브라우저에서 실행될 때는 그냥 HTML이기 때문입니다.
+        document.getElementById('registerForm').addEventListener('submit', async function(event) {
+            
+            event.preventDefault(); 
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const nickname = document.getElementById('nickname').value;
+
+            const data = {
+                email: email,
+                password: password,
+                nickname: nickname
+            };
+
+            const resultMsg = document.getElementById('resultMessage');
+
+            try {
+                // 이 EJS 폼도 결국 'POST /users/register' API를 호출합니다.
+                const response = await fetch('/users/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    resultMsg.style.color = 'green';
+                    resultMsg.textContent = '✅ 회원가입 성공! (ID: ' + result.userId + ')';
+                } else {
+                    resultMsg.style.color = 'red';
+                    resultMsg.textContent = '오류: ' + result.error;
+                }
+
+            } catch (error) {
+                resultMsg.style.color = 'red';
+                resultMsg.textContent = '서버 통신 오류: ' + error.message;
+            }
+        });
+    </script>
+
+</body>
+</html>
