@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>회원가입 (EJS)</title> <style>
+    <title>회원가입 (EJS)</title>
+    <style>
         body { font-family: sans-serif; display: grid; place-items: center; min-height: 80vh; }
         form { border: 1px solid #ccc; padding: 20px; border-radius: 8px; }
         div { margin-bottom: 15px; }
@@ -33,8 +34,6 @@
     </form>
 
     <script>
-        // 이 스크립트는 'register.html'의 스크립트와 100% 동일합니다.
-        // EJS 파일은 브라우저에서 실행될 때는 그냥 HTML이기 때문입니다.
         document.getElementById('registerForm').addEventListener('submit', async function(event) {
             
             event.preventDefault(); 
@@ -52,7 +51,7 @@
             const resultMsg = document.getElementById('resultMessage');
 
             try {
-                // 이 EJS 폼도 결국 'POST /users/register' API를 호출합니다.
+                // 이 폼은 'POST /users/register' API를 호출합니다.
                 const response = await fetch('/users/register', {
                     method: 'POST',
                     headers: {
