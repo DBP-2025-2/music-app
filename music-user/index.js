@@ -1,24 +1,46 @@
 // index.js
+
+// ### 1. dotenv 설정을 db.js가 아닌 index.js 맨 위로 이동 ###
+require('dotenv').config();
+
 const express = require('express');
-const db = require('./db'); // DB 연결
-const bcrypt = require('bcrypt'); // ★비밀번호 암호화 라이브러리
+const db = require('./db');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 const app = express();
 const port = 3000;
 
 app.use(express.json());
-app.use(express.static('public'))
+app.use(express.static('public'));
 app.set('view engine', 'ejs');
 
-// --- API 라우터(기능)들은 이 아래에 추가합니다 ---
 
-// (기존 테스트 API)
-// (기존 테스트 API)
+//  2. 중복 제거 (원래 메시지로 통일) 
 app.get('/', (req, res) => {
-  // ▼▼▼ 이 메시지를 수정 ▼▼▼
-  res.send('서버 재시작 테스트 123. 이 메시지가 보여야 합니다.');
+  res.send('🎵 My Music API 서버가 실행 중입니다! 🎵');
 });
+
+// 2. 중복 제거 (1개만 남김) 
+app.get('/register', (req, res) => {
+  try {
+    res.render('register');
+  } catch (error) {
+    console.error('페이지 렌더링 오류:', error);
+    res.status(500).send('페이지를 불러오는 데 실패했습니다.');
+  }
+});
+
+// GET /login 요청이 오면, 'views/login.ejs' 파일을 렌더링
+app.get('/login', (req, res) => {
+  try {
+    res.render('login');
+  } catch (error) {
+    console.error('페이지 렌더링 오류:', error);
+    res.status(500).send('페이지를 불러오는 데 실패했습니다.');
+  }
+});
+
 // ▼▼▼ [새로 추가된 회원가입 API] ▼▼▼
 app.post('/users/register', async (req, res) => {
   try {
@@ -30,8 +52,7 @@ app.post('/users/register', async (req, res) => {
       return res.status(400).json({ error: '이메일과 비밀번호는 필수입니다.' });
     }
 
-    // 3. (★중요) 비밀번호 해시(암호화)
-    // 명세서 요구사항: "반드시 해시(hash) 처리된 값(password_hash)으로 저장"
+    // 3. 비밀번호 해시(암호화)
     const saltRounds = 10; // 암호화 강도
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
@@ -42,21 +63,17 @@ app.post('/users/register', async (req, res) => {
     );
 
     // 5. 성공 응답
-    // (result.insertId는 방금 생성된 user_id입니다)
     res.status(201).json({
       message: '✅ 회원가입 성공!',
       userId: result.insertId,
       email: email,
     });
-
   } catch (error) {
     // 6. 오류 처리
-    // (예: Error 1062 - 이메일 중복)
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ error: '이미 사용 중인 이메일입니다.' });
     }
     
-    // 그 외 서버 오류
     console.error('회원가입 오류:', error);
     res.status(500).json({ error: '서버 내부 오류가 발생했습니다.' });
   }
@@ -84,19 +101,18 @@ app.post('/users/login', async (req, res) => {
 
     const user = rows[0];
 
-    // 4. (★중요) 비밀번호 비교
-    // 명세서 요구사항: "사용자가 입력한 password"와 "DB의 password_hash" 비교
+    // 4. 비밀번호 비교
     const isPasswordMatch = await bcrypt.compare(password, user.password_hash);
 
     if (!isPasswordMatch) {
       return res.status(401).json({ error: '이메일 또는 비밀번호가 잘못되었습니다.' });
     }
 
-    // 5. (★중요) 로그인 성공! 인증 토큰(JWT) 생성
-    // (이 토큰이 "로그인되었습니다"라는 증표입니다)
+    // 5. 로그인 인증 토큰(JWT) 생성
+    // ### 1. 보안 수정 ###
     const token = jwt.sign(
-      { userId: user.user_id, email: user.email, nickname: user.nickname }, // 토큰에 담을 정보
-      'YOUR_SECRET_KEY', // ★(필수) 토큰 서명용 비밀 키. .env 파일로 빼는 것이 좋습니다.
+      { userId: user.user_id, email: user.email, nickname: user.nickname }, 
+      process.env.JWT_SECRET, // .env 파일에서 비밀 키 읽어오기
       { expiresIn: '1h' } // 토큰 유효 시간 (예: 1시간)
     );
 
@@ -111,26 +127,9 @@ app.post('/users/login', async (req, res) => {
       message: '✅ 로그인 성공!',
       token: token
     });
-
   } catch (error) {
     console.error('로그인 오류:', error);
     res.status(500).json({ error: '서버 내부 오류가 발생했습니다.' });
-  }
-});
-
-app.get('/', (req, res) => {
-  res.send('🎵 My Music API 서버가 실행 중입니다! 🎵');
-});
-
-// ▼▼▼ [EJS 폼 페이지 라우터 추가] ▼▼▼
-// GET /register 요청이 오면, 'views/register.ejs' 파일을 렌더링해서 보여줍니다.
-app.get('/register', (req, res) => {
-  try {
-    // 'register' 이름만 쓰면, Express가 알아서 'views/register.ejs'를 찾습니다.
-    res.render('register');
-  } catch (error) {
-    console.error('페이지 렌더링 오류:', error);
-    res.status(500).send('페이지를 불러오는 데 실패했습니다.');
   }
 });
 
