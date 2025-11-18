@@ -55,40 +55,50 @@ export default function AlbumsPage() {
     e.preventDefault();
     if (!title.trim() || !artistId) return;
     setBusy(true);
-    await fetchJson(`${API}/albums`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title,
-        artistId: Number(artistId),
-        year: year ? Number(year) : null,
-      }),
-    });
-    setTitle("");
-    setArtistId("");
-    setYear("");
-    await loadAll();
-    setBusy(false);
+    try {
+      await fetchJson(`${API}/albums`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          artistId: Number(artistId),
+          year: year ? Number(year) : null,
+        }),
+      });
+      setTitle("");
+      setArtistId("");
+      setYear("");
+      await loadAll();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const save = async (id) => {
     if (!editTitle.trim() || !editArtistId) return;
     setBusy(true);
-    await fetchJson(`${API}/albums/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: editTitle,
-        artistId: Number(editArtistId),
-        year: editYear === "" ? null : Number(editYear),
-      }),
-    });
-    setEditId(null);
-    setEditTitle("");
-    setEditArtistId("");
-    setEditYear("");
-    await loadAll();
-    setBusy(false);
+    try {
+      await fetchJson(`${API}/albums/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editTitle,
+          artistId: Number(editArtistId),
+          year: editYear === "" ? null : Number(editYear),
+        }),
+      });
+      setEditId(null);
+      setEditTitle("");
+      setEditArtistId("");
+      setEditYear("");
+      await loadAll();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const remove = async (id) => {

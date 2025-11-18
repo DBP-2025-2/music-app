@@ -1,18 +1,13 @@
 // backend/src/routes/albums.js
 import { Router } from "express";
-import {
-  getAlbums,
-  createAlbum,
-  updateAlbum,
-  deleteAlbum,
-} from "../store/db.mysql.js";
+import * as db from "../store/db.mysql.js";
 
 const router = Router();
 
 // GET /albums
 router.get("/", async (req, res, next) => {
   try {
-    const albums = await getAlbums();
+    const albums = await db.getAlbums();
     res.json(albums);
   } catch (err) {
     next(err);
@@ -20,17 +15,20 @@ router.get("/", async (req, res, next) => {
 });
 
 // POST /albums
+// body: { title, artistId, year }
 router.post("/", async (req, res, next) => {
   try {
-    const { title, artistId, year } = req.body;
-    if (!title || !title.trim() || !artistId) {
-      return res.status(400).json({ error: "title and artistId are required" });
+    const { title, artistId, year } = req.body ?? {};
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: "title is required" });
     }
-    const album = await createAlbum({
-      title: title.trim(),
-      artistId: Number(artistId),
-      year: year ? Number(year) : null,
-    });
+
+    const aId = Number(artistId);
+    if (!aId || aId <= 0) {
+      return res.status(400).json({ error: "artistId must be a valid number" });
+    }
+
+    const album = await db.createAlbum({ title, artistId: aId });
     res.status(201).json(album);
   } catch (err) {
     next(err);
@@ -38,18 +36,21 @@ router.post("/", async (req, res, next) => {
 });
 
 // PATCH /albums/:id
+// body: { title, artistId, year }
 router.patch("/:id", async (req, res, next) => {
   try {
     const id = Number(req.params.id);
-    const { title, artistId, year } = req.body;
-    if (!id || !title || !title.trim() || !artistId) {
-      return res.status(400).json({ error: "invalid data" });
+    const { title, artistId, year } = req.body ?? {};
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: "title is required" });
     }
-    const updated = await updateAlbum(id, {
-      title: title.trim(),
-      artistId: Number(artistId),
-      year: year ? Number(year) : null,
-    });
+
+    const aId = Number(artistId);
+    if (!aId || aId <= 0) {
+      return res.status(400).json({ error: "artistId must be a valid number" });
+    }
+
+    const updated = await db.updateAlbum(id, { title, artistId: aId });
     res.json(updated);
   } catch (err) {
     next(err);
@@ -60,10 +61,7 @@ router.patch("/:id", async (req, res, next) => {
 router.delete("/:id", async (req, res, next) => {
   try {
     const id = Number(req.params.id);
-    if (!id) {
-      return res.status(400).json({ error: "invalid id" });
-    }
-    await deleteAlbum(id);
+    await db.deleteAlbum(id);
     res.status(204).end();
   } catch (err) {
     next(err);

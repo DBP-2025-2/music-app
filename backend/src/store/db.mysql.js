@@ -14,6 +14,9 @@ dotenv.config();
  *  - song_artists(song_id, artist_id, display_order, created_at)
  *  - playlists(playlist_id, user_id, name, is_public, created_at, updated_at)
  *  - playlist_items(item_id, playlist_id, song_id, position, note, added_at)
+ *  - charts(chart_id, chart_type, year, week, rank, song_id, week_start_date, week_end_date)
+ *  - follows(follower_id, following_id, target_type, created_at)
+ *  - play_history(history_id, user_id, song_id, played_at)
  *  - users(user_id, email, password_hash, nickname, created_at, last_login_at)
  */
 
@@ -57,7 +60,18 @@ const ITEM_PLAYLIST_ID_COL = "playlist_id";
 const ITEM_SONG_ID_COL = "song_id";
 const ITEM_POSITION_COL = "position";
 
-// === Users (지금은 기본 user_id=1만 사용) ===
+// === Charts ===
+const CHARTS_TABLE = "charts";
+const CHART_ID_COL = "chart_id";
+
+// === Follows ===
+const FOLLOWS_TABLE = "follows";
+
+// === Play History ===
+const PLAY_HISTORY_TABLE = "play_history";
+const HISTORY_ID_COL = "history_id";
+
+// === Users ===
 const USERS_TABLE = "users";
 const USER_ID_COL = "user_id";
 
@@ -182,7 +196,7 @@ export async function createAlbum({ title, artistId }) {
     id: result.insertId,
     title: trimmed,
     artistId,
-    year: null, // 필요하면 나중에 다시 SELECT로 YEAR(created_at) 읽기
+    year: null,
   };
 }
 
@@ -221,7 +235,6 @@ export async function deleteAlbum(id) {
 // GET /songs 또는 /songs?artistId=...
 export async function getSongs({ artistId } = {}) {
   if (artistId) {
-    // 특정 아티스트의 곡만
     const [rows] = await pool.query(
       `
       SELECT
@@ -239,7 +252,6 @@ export async function getSongs({ artistId } = {}) {
     );
     return rows;
   } else {
-    // 전체 곡 + 메인 아티스트(첫 번째)를 붙여서 반환
     const [rows] = await pool.query(
       `
       SELECT
@@ -266,7 +278,6 @@ export async function createSong({ title, artistId }) {
   try {
     await conn.beginTransaction();
 
-    // 1) 곡 추가 (title_norm 포함)
     const [songResult] = await conn.query(
       `
       INSERT INTO ${SONGS_TABLE}
@@ -277,7 +288,6 @@ export async function createSong({ title, artistId }) {
     );
     const songId = songResult.insertId;
 
-    // 2) song_artists에 메인 아티스트 연결 (display_order = 1)
     await conn.query(
       `
       INSERT INTO ${SONG_ARTISTS_TABLE}
@@ -307,7 +317,6 @@ export async function updateSong(id, { title, artistId }) {
   try {
     await conn.beginTransaction();
 
-    // 1) 곡 제목 + title_norm 수정
     await conn.query(
       `
       UPDATE ${SONGS_TABLE}
@@ -317,7 +326,6 @@ export async function updateSong(id, { title, artistId }) {
       [trimmed, norm, id]
     );
 
-    // 2) 메인 아티스트 변경
     const [rows] = await conn.query(
       `
       SELECT ${SA_SONG_ID_COL}
@@ -365,7 +373,6 @@ export async function deleteSong(id) {
   try {
     await conn.beginTransaction();
 
-    // song_artists 먼저 삭제 (FK 제약 있을 수도 있으니)
     await conn.query(
       `
       DELETE FROM ${SONG_ARTISTS_TABLE}
@@ -374,7 +381,6 @@ export async function deleteSong(id) {
       [id]
     );
 
-    // 그 다음 곡 삭제
     await conn.query(
       `
       DELETE FROM ${SONGS_TABLE}
@@ -396,7 +402,7 @@ export async function deleteSong(id) {
 // Playlists
 // --------------------------------------------------------------------
 
-// 지금은 로그인 기능이 없으니까, 임시로 user_id=1, is_public=1을 기본값으로 사용
+// 지금은 로그인 기능이 없으니까, 임시로 user_id=1, is_public=1 사용
 const DEFAULT_USER_ID = 1;
 
 // GET /playlists
@@ -447,7 +453,6 @@ export async function deletePlaylist(id) {
   try {
     await conn.beginTransaction();
 
-    // 먼저 playlist_items 삭제
     await conn.query(
       `
       DELETE FROM ${PLAYLIST_ITEMS_TABLE}
@@ -456,7 +461,6 @@ export async function deletePlaylist(id) {
       [id]
     );
 
-    // 그 다음 플레이리스트 삭제
     await conn.query(
       `
       DELETE FROM ${PLAYLISTS_TABLE}
@@ -498,7 +502,6 @@ export async function getPlaylistItems(playlistId) {
 
 // POST /playlists/:id/items
 export async function addPlaylistItem({ playlistId, songId }) {
-  // 중복 체크
   const [existing] = await pool.query(
     `
     SELECT ${ITEM_ID_COL} AS id
@@ -511,7 +514,6 @@ export async function addPlaylistItem({ playlistId, songId }) {
     throw new Error("이미 이 플레이리스트에 있는 곡입니다.");
   }
 
-  // position = 현재 최대값 + 1
   const [posRows] = await pool.query(
     `
     SELECT COALESCE(MAX(${ITEM_POSITION_COL}), 0) AS maxPos
@@ -548,4 +550,98 @@ export async function deletePlaylistItem(id) {
     `,
     [id]
   );
+}
+
+// --------------------------------------------------------------------
+// Charts  (READ-ONLY)
+// --------------------------------------------------------------------
+
+// GET /charts
+// --------------------------------------------------------------------
+// Charts  (READ-ONLY)
+// --------------------------------------------------------------------
+
+// GET /charts
+export async function getCharts() {
+  // 1) SQL은 그냥 * 으로 다 가져오고
+  const [rows] = await pool.query(
+    `
+    SELECT *
+    FROM ${CHARTS_TABLE}
+    ORDER BY year DESC, week DESC, \`rank\` ASC
+    `
+  );
+
+  // 2) 자바스크립트 쪽에서 필요한 이름으로 바꿔서 리턴
+  return rows.map((row) => ({
+    id: row.chart_id,
+    chartType: row.chart_type,
+    year: row.year,
+    week: row.week,
+    rank: row.rank,
+    songId: row.song_id,
+    weekStartDate: row.week_start_date,
+    weekEndDate: row.week_end_date,
+  }));
+}
+
+// --------------------------------------------------------------------
+// Follows  (READ-ONLY 목록용)
+// --------------------------------------------------------------------
+
+// GET /follows
+export async function getFollows() {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      follower_id  AS followerId,
+      following_id AS followingId,
+      target_type  AS targetType,
+      created_at   AS createdAt
+    FROM ${FOLLOWS_TABLE}
+    ORDER BY created_at DESC
+    `
+  );
+  return rows;
+}
+
+// --------------------------------------------------------------------
+// Play History (READ-ONLY)
+// --------------------------------------------------------------------
+
+// GET /play-history
+export async function getPlayHistory() {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      ${HISTORY_ID_COL} AS id,
+      user_id           AS userId,
+      song_id           AS songId,
+      played_at         AS playedAt
+    FROM ${PLAY_HISTORY_TABLE}
+    ORDER BY played_at DESC
+    `
+  );
+  return rows;
+}
+
+// --------------------------------------------------------------------
+// Users (READ-ONLY)
+// --------------------------------------------------------------------
+
+// GET /users
+export async function getUsers() {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      ${USER_ID_COL}   AS id,
+      email,
+      nickname,
+      created_at    AS createdAt,
+      last_login_at AS lastLoginAt
+    FROM ${USERS_TABLE}
+    ORDER BY ${USER_ID_COL} ASC
+    `
+  );
+  return rows;
 }

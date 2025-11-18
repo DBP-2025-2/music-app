@@ -47,6 +47,38 @@ function Layout({ children }) {
           >
             Playlists
           </NavLink>
+          <NavLink
+            to="/charts"
+            className={({ isActive }) =>
+              "nav-link" + (isActive ? " nav-link--active" : "")
+            }
+          >
+            Charts
+          </NavLink>
+          <NavLink
+            to="/follows"
+            className={({ isActive }) =>
+              "nav-link" + (isActive ? " nav-link--active" : "")
+            }
+          >
+            Follows
+          </NavLink>
+          <NavLink
+            to="/history"
+            className={({ isActive }) =>
+              "nav-link" + (isActive ? " nav-link--active" : "")
+            }
+          >
+            History
+          </NavLink>
+          <NavLink
+            to="/users"
+            className={({ isActive }) =>
+              "nav-link" + (isActive ? " nav-link--active" : "")
+            }
+          >
+            Users
+          </NavLink>
         </nav>
       </header>
 
@@ -55,7 +87,8 @@ function Layout({ children }) {
   );
 }
 
-/* ---------- Artists Page ---------- */
+/* ---------- 기존 Pages: Artists / Songs / Albums / Playlists ---------- */
+/* (이 부분은 우리가 앞에서 만든 그대로 — 내용 동일, 생략 안 함) */
 
 function ArtistsPage() {
   const [artists, setArtists] = useState([]);
@@ -158,8 +191,6 @@ function ArtistsPage() {
     </section>
   );
 }
-
-/* ---------- Songs Page ---------- */
 
 function SongsPage() {
   const [songs, setSongs] = useState([]);
@@ -277,8 +308,6 @@ function SongsPage() {
     </section>
   );
 }
-
-/* ---------- Albums Page ---------- */
 
 function AlbumsPage() {
   const [albums, setAlbums] = useState([]);
@@ -399,8 +428,6 @@ function AlbumsPage() {
   );
 }
 
-/* ---------- Playlists Page ---------- */
-
 function PlaylistsPage() {
   const [playlists, setPlaylists] = useState([]);
   const [name, setName] = useState("");
@@ -503,6 +530,241 @@ function PlaylistsPage() {
   );
 }
 
+/* ---------- 새 페이지들: Charts / Follows / History / Users (READ ONLY) ---------- */
+
+function ChartsPage() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  async function load() {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchJson(`${API}/charts`);
+      setRows(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <section className="card">
+      <div className="card-header">
+        <div className="card-title">
+          <span>📊</span>
+          <span>
+            Charts <span className="card-badge">{rows.length.toString()}</span>
+          </span>
+        </div>
+      </div>
+
+      {loading && <p className="text-muted">불러오는 중...</p>}
+      {error && (
+        <p className="text-error">
+          ⚠️ Error: <span>{error}</span>
+        </p>
+      )}
+
+      <ul className="list">
+        {rows.map((c) => (
+          <li key={c.id} className="list-item">
+            <span>
+              <span className="text-muted">
+                {c.chartType} / {c.year}년 {c.week}주{" "}
+              </span>
+              <strong>#{c.rank}</strong>
+              <span className="text-muted"> (songId: {c.songId})</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function FollowsPage() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  async function load() {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchJson(`${API}/follows`);
+      setRows(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <section className="card">
+      <div className="card-header">
+        <div className="card-title">
+          <span>👥</span>
+          <span>
+            Follows <span className="card-badge">{rows.length.toString()}</span>
+          </span>
+        </div>
+      </div>
+
+      {loading && <p className="text-muted">불러오는 중...</p>}
+      {error && (
+        <p className="text-error">
+          ⚠️ Error: <span>{error}</span>
+        </p>
+      )}
+
+      <ul className="list">
+        {rows.map((f, idx) => (
+          <li key={idx} className="list-item">
+            <span>
+              <strong>{f.followerId}</strong>
+              <span className="text-muted">
+                {" "}
+                → ({f.targetType}) {f.followingId}
+              </span>
+            </span>
+            <span className="text-muted">
+              {f.createdAt && f.createdAt.substring(0, 10)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function HistoryPage() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  async function load() {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchJson(`${API}/play-history`);
+      setRows(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <section className="card">
+      <div className="card-header">
+        <div className="card-title">
+          <span>🕒</span>
+          <span>
+            Play History{" "}
+            <span className="card-badge">{rows.length.toString()}</span>
+          </span>
+        </div>
+      </div>
+
+      {loading && <p className="text-muted">불러오는 중...</p>}
+      {error && (
+        <p className="text-error">
+          ⚠️ Error: <span>{error}</span>
+        </p>
+      )}
+
+      <ul className="list">
+        {rows.map((h) => (
+          <li key={h.id} className="list-item">
+            <span>
+              <strong>user {h.userId}</strong>
+              <span className="text-muted"> → song {h.songId}</span>
+            </span>
+            <span className="text-muted">
+              {h.playedAt && h.playedAt.replace("T", " ").substring(0, 19)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function UsersPage() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  async function load() {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchJson(`${API}/users`);
+      setRows(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <section className="card">
+      <div className="card-header">
+        <div className="card-title">
+          <span>🙋‍♀️</span>
+          <span>
+            Users <span className="card-badge">{rows.length.toString()}</span>
+          </span>
+        </div>
+      </div>
+
+      {loading && <p className="text-muted">불러오는 중...</p>}
+      {error && (
+        <p className="text-error">
+          ⚠️ Error: <span>{error}</span>
+        </p>
+      )}
+
+      <ul className="list">
+        {rows.map((u) => (
+          <li key={u.id} className="list-item">
+            <span>
+              <span className="text-muted">#{u.id} </span>
+              <strong>{u.nickname || u.email}</strong>
+              {u.nickname && <span className="text-muted"> ({u.email})</span>}
+            </span>
+            <span className="text-muted">
+              가입: {u.createdAt && u.createdAt.substring(0, 10)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /* ---------- App Root ---------- */
 
 export default function App() {
@@ -515,6 +777,10 @@ export default function App() {
           <Route path="/songs" element={<SongsPage />} />
           <Route path="/albums" element={<AlbumsPage />} />
           <Route path="/playlists" element={<PlaylistsPage />} />
+          <Route path="/charts" element={<ChartsPage />} />
+          <Route path="/follows" element={<FollowsPage />} />
+          <Route path="/history" element={<HistoryPage />} />
+          <Route path="/users" element={<UsersPage />} />
         </Routes>
       </Layout>
     </BrowserRouter>
