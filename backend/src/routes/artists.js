@@ -1,38 +1,65 @@
+// backend/src/routes/artists.js
 import { Router } from "express";
-import db from "../store/db.js";
+import {
+  getArtists,
+  createArtist,
+  updateArtist,
+  deleteArtist,
+} from "../store/db.mysql.js";
 
 const router = Router();
 
-router.get("/", (req, res) => {
-  res.json(db.listArtists());
+// GET /artists
+router.get("/", async (req, res, next) => {
+  try {
+    const artists = await getArtists();
+    res.json(artists);
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.post("/", (req, res) => {
-  const { name } = req.body;
-  if (!name?.trim()) return res.status(400).json({ error: "name is required" });
-
-  const item = db.createArtist(name);
-  res.status(201).json(item);
+// POST /artists
+router.post("/", async (req, res, next) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: "name is required" });
+    }
+    const artist = await createArtist({ name: name.trim() });
+    res.status(201).json(artist);
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.patch("/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const { name } = req.body;
-
-  if (!name?.trim()) return res.status(400).json({ error: "name is required" });
-
-  const updated = db.updateArtist(id, name);
-  if (!updated) return res.status(404).json({ error: "not found" });
-
-  res.json(updated);
+// PATCH /artists/:id
+router.patch("/:id", async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const { name } = req.body;
+    if (!id || !name || !name.trim()) {
+      return res.status(400).json({ error: "invalid id or name" });
+    }
+    const updated = await updateArtist(id, { name: name.trim() });
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.delete("/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const ok = db.deleteArtist(id);
-
-  if (!ok) return res.status(404).json({ error: "not found" });
-  res.status(204).end();
+// DELETE /artists/:id
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) {
+      return res.status(400).json({ error: "invalid id" });
+    }
+    await deleteArtist(id);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;

@@ -1,50 +1,73 @@
+// backend/src/routes/albums.js
 import { Router } from "express";
-import db from "../store/db.js";
+import {
+  getAlbums,
+  createAlbum,
+  updateAlbum,
+  deleteAlbum,
+} from "../store/db.mysql.js";
 
 const router = Router();
 
-router.get("/", (req, res) => {
-  const { artistId, year } = req.query;
-  res.json(db.listAlbums({ artistId, year }));
+// GET /albums
+router.get("/", async (req, res, next) => {
+  try {
+    const albums = await getAlbums();
+    res.json(albums);
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.post("/", (req, res) => {
-  const { title, artistId, year } = req.body;
-
-  if (!title?.trim())
-    return res.status(400).json({ error: "title is required" });
-  if (!artistId) return res.status(400).json({ error: "artistId is required" });
-
-  if (!db.findArtist(Number(artistId)))
-    return res.status(404).json({ error: "artist not found" });
-
-  const item = db.createAlbum({ title, artistId, year });
-  res.status(201).json(item);
+// POST /albums
+router.post("/", async (req, res, next) => {
+  try {
+    const { title, artistId, year } = req.body;
+    if (!title || !title.trim() || !artistId) {
+      return res.status(400).json({ error: "title and artistId are required" });
+    }
+    const album = await createAlbum({
+      title: title.trim(),
+      artistId: Number(artistId),
+      year: year ? Number(year) : null,
+    });
+    res.status(201).json(album);
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.patch("/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const { title, artistId, year } = req.body;
-
-  if (title !== undefined && !String(title).trim())
-    return res.status(400).json({ error: "title is required" });
-
-  if (artistId !== undefined && !db.findArtist(Number(artistId)))
-    return res.status(404).json({ error: "artist not found" });
-
-  const updated = db.updateAlbum(id, { title, artistId, year });
-  if (!updated) return res.status(404).json({ error: "not found" });
-
-  res.json(updated);
+// PATCH /albums/:id
+router.patch("/:id", async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const { title, artistId, year } = req.body;
+    if (!id || !title || !title.trim() || !artistId) {
+      return res.status(400).json({ error: "invalid data" });
+    }
+    const updated = await updateAlbum(id, {
+      title: title.trim(),
+      artistId: Number(artistId),
+      year: year ? Number(year) : null,
+    });
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.delete("/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const ok = db.deleteAlbum(id);
-
-  if (!ok) return res.status(404).json({ error: "not found" });
-
-  res.status(204).end();
+// DELETE /albums/:id
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) {
+      return res.status(400).json({ error: "invalid id" });
+    }
+    await deleteAlbum(id);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;

@@ -1,48 +1,74 @@
+// backend/src/routes/songs.js
 import { Router } from "express";
-import db from "../store/db.js";
+import {
+  getSongs,
+  createSong,
+  updateSong,
+  deleteSong,
+} from "../store/db.mysql.js";
 
 const router = Router();
 
-router.get("/", (req, res) => {
-  const { artistId } = req.query;
-  res.json(db.listSongs({ artistId }));
+// GET /songs?artistId=1 (선택)
+router.get("/", async (req, res, next) => {
+  try {
+    const { artistId } = req.query;
+    const songs = await getSongs({
+      artistId: artistId ? Number(artistId) : undefined,
+    });
+    res.json(songs);
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.post("/", (req, res) => {
-  const { title, artistId } = req.body;
-  if (!title?.trim())
-    return res.status(400).json({ error: "title is required" });
-  if (!artistId) return res.status(400).json({ error: "artistId is required" });
-
-  if (!db.findArtist(Number(artistId)))
-    return res.status(404).json({ error: "artist not found" });
-
-  const item = db.createSong({ title, artistId });
-  res.status(201).json(item);
+// POST /songs
+router.post("/", async (req, res, next) => {
+  try {
+    const { title, artistId } = req.body;
+    if (!title || !title.trim() || !artistId) {
+      return res.status(400).json({ error: "title and artistId are required" });
+    }
+    const song = await createSong({
+      title: title.trim(),
+      artistId: Number(artistId),
+    });
+    res.status(201).json(song);
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.patch("/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const { title, artistId } = req.body;
-
-  if (title !== undefined && !String(title).trim())
-    return res.status(400).json({ error: "title is required" });
-
-  if (artistId !== undefined && !db.findArtist(Number(artistId)))
-    return res.status(404).json({ error: "artist not found" });
-
-  const updated = db.updateSong(id, { title, artistId });
-  if (!updated) return res.status(404).json({ error: "not found" });
-
-  res.json(updated);
+// PATCH /songs/:id
+router.patch("/:id", async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const { title, artistId } = req.body;
+    if (!id || !title || !title.trim() || !artistId) {
+      return res.status(400).json({ error: "invalid data" });
+    }
+    const updated = await updateSong(id, {
+      title: title.trim(),
+      artistId: Number(artistId),
+    });
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.delete("/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const ok = db.deleteSong(id);
-  if (!ok) return res.status(404).json({ error: "not found" });
-
-  res.status(204).end();
+// DELETE /songs/:id
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) {
+      return res.status(400).json({ error: "invalid id" });
+    }
+    await deleteSong(id);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;

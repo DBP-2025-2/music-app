@@ -1,33 +1,48 @@
+// backend/src/server.js
 import express from "express";
 import cors from "cors";
+import morgan from "morgan";
+import dotenv from "dotenv";
 
-// 라우트
-import artists from "./routes/artists.js";
-import songs from "./routes/songs.js";
-import albums from "./routes/albums.js";
-import playlists from "./routes/playlists.js";
+import artistsRouter from "./routes/artists.js";
+import songsRouter from "./routes/songs.js";
+import albumsRouter from "./routes/albums.js";
+import playlistsRouter from "./routes/playlists.js";
+import { testConnection } from "./store/db.mysql.js";
+
+dotenv.config();
 
 const app = express();
+const PORT = process.env.PORT || 4000;
 
+// 미들웨어
 app.use(cors());
 app.use(express.json());
+app.use(morgan("dev"));
 
-// 서버체크
-app.get("/health", (_req, res) => res.json({ ok: true }));
+// 라우터
+app.use("/artists", artistsRouter);
+app.use("/songs", songsRouter);
+app.use("/albums", albumsRouter);
+app.use("/playlists", playlistsRouter);
 
-// 라우트 등록
-app.use("/artists", artists);
-app.use("/songs", songs);
-app.use("/albums", albums);
-app.use("/playlists", playlists);
-
-// 에러 핸들러
-app.use((err, _req, res, _next) => {
-  console.error("❌ Server Error:", err);
-  res.status(500).json({ error: "server error" });
+// 헬스체크 & DB 연결 테스트용
+app.get("/health", async (req, res) => {
+  try {
+    const ok = await testConnection();
+    res.json({ ok, db: "mysql" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: String(err) });
+  }
 });
 
-const PORT = 4000;
+// 에러 핸들러
+app.use((err, req, res, next) => {
+  console.error("❌ Server Error:", err);
+  res.status(500).json({ error: "Server error", detail: String(err) });
+});
+
 app.listen(PORT, () => {
   console.log(`✅ API running at http://localhost:${PORT}`);
 });

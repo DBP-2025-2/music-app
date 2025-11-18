@@ -1,182 +1,522 @@
-import { useEffect, useMemo, useState } from "react";
-import { API } from "../lib/api";
-import { fetchJson } from "../lib/http";
+// frontend/src/App.jsx
+import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { API } from "./lib/api";
+import { fetchJson } from "./lib/http";
 
-export default function ArtistsPage() {
-  const [list, setList] = useState([]);
+/* ---------- 공통 레이아웃 ---------- */
+
+function Layout({ children }) {
+  return (
+    <>
+      <header className="app-header">
+        <div className="app-title">
+          <span>🎵</span>
+          <span>Music App</span>
+        </div>
+        <nav className="app-nav">
+          <NavLink
+            to="/artists"
+            className={({ isActive }) =>
+              "nav-link" + (isActive ? " nav-link--active" : "")
+            }
+          >
+            Artists
+          </NavLink>
+          <NavLink
+            to="/songs"
+            className={({ isActive }) =>
+              "nav-link" + (isActive ? " nav-link--active" : "")
+            }
+          >
+            Songs
+          </NavLink>
+          <NavLink
+            to="/albums"
+            className={({ isActive }) =>
+              "nav-link" + (isActive ? " nav-link--active" : "")
+            }
+          >
+            Albums
+          </NavLink>
+          <NavLink
+            to="/playlists"
+            className={({ isActive }) =>
+              "nav-link" + (isActive ? " nav-link--active" : "")
+            }
+          >
+            Playlists
+          </NavLink>
+        </nav>
+      </header>
+
+      <main className="app-main">{children}</main>
+    </>
+  );
+}
+
+/* ---------- Artists Page ---------- */
+
+function ArtistsPage() {
+  const [artists, setArtists] = useState([]);
   const [name, setName] = useState("");
-  const [editId, setEditId] = useState(null);
-  const [editName, setEditName] = useState("");
-  const [q, setQ] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const filtered = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    if (!t) return list;
-    return list.filter((a) => a.name.toLowerCase().includes(t));
-  }, [q, list]);
-
-  const load = async () => {
+  async function load() {
     try {
-      setError("");
       setLoading(true);
+      setError(null);
       const data = await fetchJson(`${API}/artists`);
-      setList(data);
-    } catch (e) {
-      setError(String(e));
-      console.error(e);
+      setArtists(data);
+    } catch (err) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  async function handleAdd() {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    try {
+      const newArtist = await fetchJson(`${API}/artists`, {
+        method: "POST",
+        body: JSON.stringify({ name: trimmed }),
+      });
+      setArtists((prev) => [newArtist, ...prev]);
+      setName("");
+    } catch (err) {
+      alert(`[Artists] ${err.message}`);
+    }
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm("정말 삭제할까요?")) return;
+    try {
+      await fetchJson(`${API}/artists/${id}`, { method: "DELETE" });
+      setArtists((prev) => prev.filter((a) => a.id !== id));
+    } catch (err) {
+      alert(`[Artists] 삭제 실패: ${err.message}`);
+    }
+  }
 
   useEffect(() => {
     load();
   }, []);
 
-  const add = async (e) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    try {
-      setBusy(true);
-      await fetchJson(`${API}/artists`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      setName("");
-      await load();
-    } catch (e) {
-      alert(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const save = async (id) => {
-    if (!editName.trim()) return;
-    try {
-      setBusy(true);
-      await fetchJson(`${API}/artists/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName }),
-      });
-      setEditId(null);
-      setEditName("");
-      await load();
-    } catch (e) {
-      alert(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const remove = async (id) => {
-    if (!confirm("정말 삭제할까요? 관련 노래/앨범도 정리됩니다.")) return;
-    try {
-      setBusy(true);
-      await fetchJson(`${API}/artists/${id}`, { method: "DELETE" });
-      await load();
-    } catch (e) {
-      alert(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
-    <div className="panel">
-      <div
-        className="row wrap"
-        style={{ justifyContent: "space-between", marginBottom: 12 }}
-      >
-        <h2 style={{ margin: 0 }}>
-          👤 Artists <span className="badge">{filtered.length}</span>
-        </h2>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="검색 (이름)"
-          style={{ minWidth: 220 }}
-        />
+    <section className="card">
+      <div className="card-header">
+        <div className="card-title">
+          <span>👤</span>
+          <span>
+            Artists{" "}
+            <span className="card-badge">{artists.length.toString()}</span>
+          </span>
+        </div>
       </div>
 
-      <form onSubmit={add} className="row" style={{ gap: 8, marginBottom: 12 }}>
+      <div className="card-toolbar">
         <input
+          className="field-input"
+          placeholder="아티스트 이름"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="아티스트 이름"
-          style={{ flex: 1 }}
         />
-        <button className="btn primary" disabled={!name.trim() || busy}>
-          ➕ 추가 {busy && <span className="spinner" />}
+        <button className="btn btn-primary" onClick={handleAdd}>
+          ➕ 추가
         </button>
-        <button type="button" className="btn ghost" onClick={load}>
+        <button className="btn btn-secondary" onClick={load}>
           🔄 새로고침
         </button>
-      </form>
-
-      {loading && <div className="empty">⏳ 불러오는 중…</div>}
-      {error && (
-        <div className="empty" style={{ color: "var(--danger)" }}>
-          ❗ {error}
-        </div>
-      )}
-      {!loading && !error && filtered.length === 0 && (
-        <div className="empty">🙈 결과가 없어요</div>
-      )}
-
-      <div className="list">
-        {filtered.map((a) => (
-          <div
-            key={a.id}
-            className="item"
-            style={{ gridTemplateColumns: "1fr auto auto" }}
-          >
-            {editId === a.id ? (
-              <>
-                <input
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                />
-                <button className="btn success" onClick={() => save(a.id)}>
-                  💾 저장
-                </button>
-                <button
-                  className="btn muted"
-                  onClick={() => {
-                    setEditId(null);
-                    setEditName("");
-                  }}
-                >
-                  ↩️ 취소
-                </button>
-              </>
-            ) : (
-              <>
-                <div>
-                  #{a.id} — <b>{a.name}</b>
-                </div>
-                <button
-                  className="btn ghost"
-                  onClick={() => {
-                    setEditId(a.id);
-                    setEditName(a.name);
-                  }}
-                >
-                  ✏️ 수정
-                </button>
-                <button className="btn danger" onClick={() => remove(a.id)}>
-                  🗑️ 삭제
-                </button>
-              </>
-            )}
-          </div>
-        ))}
       </div>
-    </div>
+
+      {loading && <p className="text-muted">불러오는 중...</p>}
+      {error && (
+        <p className="text-error">
+          ⚠️ Error: <span>{error}</span>
+        </p>
+      )}
+
+      <ul className="list">
+        {artists.map((a) => (
+          <li key={a.id} className="list-item">
+            <span>
+              <span className="text-muted">#{a.id} </span>
+              <strong>{a.name}</strong>
+            </span>
+            <button
+              className="btn btn-danger"
+              onClick={() => handleDelete(a.id)}
+            >
+              삭제
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* ---------- Songs Page ---------- */
+
+function SongsPage() {
+  const [songs, setSongs] = useState([]);
+  const [title, setTitle] = useState("");
+  const [artistId, setArtistId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  async function load() {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchJson(`${API}/songs`);
+      setSongs(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAdd() {
+    const t = title.trim();
+    const aId = Number(artistId);
+    if (!t || !aId) {
+      alert("곡 제목과 artistId(숫자)를 입력해줘!");
+      return;
+    }
+    try {
+      const newSong = await fetchJson(`${API}/songs`, {
+        method: "POST",
+        body: JSON.stringify({ title: t, artistId: aId }),
+      });
+      setSongs((prev) => [newSong, ...prev]);
+      setTitle("");
+      setArtistId("");
+    } catch (err) {
+      alert(`[Songs] ${err.message}`);
+    }
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm("정말 삭제할까요?")) return;
+    try {
+      await fetchJson(`${API}/songs/${id}`, { method: "DELETE" });
+      setSongs((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      alert(`[Songs] 삭제 실패: ${err.message}`);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <section className="card">
+      <div className="card-header">
+        <div className="card-title">
+          <span>🎧</span>
+          <span>
+            Songs <span className="card-badge">{songs.length.toString()}</span>
+          </span>
+        </div>
+      </div>
+
+      <div className="card-toolbar">
+        <input
+          className="field-input"
+          placeholder="곡 제목"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <input
+          className="field-input"
+          style={{ maxWidth: 120 }}
+          placeholder="artistId"
+          value={artistId}
+          onChange={(e) => setArtistId(e.target.value)}
+        />
+        <button className="btn btn-primary" onClick={handleAdd}>
+          ➕ 추가
+        </button>
+        <button className="btn btn-secondary" onClick={load}>
+          🔄 새로고침
+        </button>
+      </div>
+
+      {loading && <p className="text-muted">불러오는 중...</p>}
+      {error && (
+        <p className="text-error">
+          ⚠️ Error: <span>{error}</span>
+        </p>
+      )}
+
+      <ul className="list">
+        {songs.map((s) => (
+          <li key={s.id} className="list-item">
+            <span>
+              <span className="text-muted">#{s.id} </span>
+              <strong>{s.title}</strong>
+              {s.artistId && (
+                <span className="text-muted"> (artistId: {s.artistId})</span>
+              )}
+            </span>
+            <button
+              className="btn btn-danger"
+              onClick={() => handleDelete(s.id)}
+            >
+              삭제
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* ---------- Albums Page ---------- */
+
+function AlbumsPage() {
+  const [albums, setAlbums] = useState([]);
+  const [title, setTitle] = useState("");
+  const [artistId, setArtistId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  async function load() {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchJson(`${API}/albums`);
+      setAlbums(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAdd() {
+    const t = title.trim();
+    const aId = Number(artistId);
+    if (!t || !aId) {
+      alert("앨범 제목과 artistId(숫자)를 입력해줘!");
+      return;
+    }
+    try {
+      const newAlbum = await fetchJson(`${API}/albums`, {
+        method: "POST",
+        body: JSON.stringify({ title: t, artistId: aId }),
+      });
+      setAlbums((prev) => [newAlbum, ...prev]);
+      setTitle("");
+      setArtistId("");
+    } catch (err) {
+      alert(`[Albums] ${err.message}`);
+    }
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm("정말 삭제할까요?")) return;
+    try {
+      await fetchJson(`${API}/albums/${id}`, { method: "DELETE" });
+      setAlbums((prev) => prev.filter((a) => a.id !== id));
+    } catch (err) {
+      alert(`[Albums] 삭제 실패: ${err.message}`);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <section className="card">
+      <div className="card-header">
+        <div className="card-title">
+          <span>💿</span>
+          <span>
+            Albums{" "}
+            <span className="card-badge">{albums.length.toString()}</span>
+          </span>
+        </div>
+      </div>
+
+      <div className="card-toolbar">
+        <input
+          className="field-input"
+          placeholder="앨범 제목"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <input
+          className="field-input"
+          style={{ maxWidth: 120 }}
+          placeholder="artistId"
+          value={artistId}
+          onChange={(e) => setArtistId(e.target.value)}
+        />
+        <button className="btn btn-primary" onClick={handleAdd}>
+          ➕ 추가
+        </button>
+        <button className="btn btn-secondary" onClick={load}>
+          🔄 새로고침
+        </button>
+      </div>
+
+      {loading && <p className="text-muted">불러오는 중...</p>}
+      {error && (
+        <p className="text-error">
+          ⚠️ Error: <span>{error}</span>
+        </p>
+      )}
+
+      <ul className="list">
+        {albums.map((a) => (
+          <li key={a.id} className="list-item">
+            <span>
+              <span className="text-muted">#{a.id} </span>
+              <strong>{a.title}</strong>
+              {a.artistId && (
+                <span className="text-muted"> (artistId: {a.artistId})</span>
+              )}
+              {a.year && <span className="text-muted"> [{a.year}]</span>}
+            </span>
+            <button
+              className="btn btn-danger"
+              onClick={() => handleDelete(a.id)}
+            >
+              삭제
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* ---------- Playlists Page ---------- */
+
+function PlaylistsPage() {
+  const [playlists, setPlaylists] = useState([]);
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  async function load() {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchJson(`${API}/playlists`);
+      setPlaylists(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAdd() {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    try {
+      const newPl = await fetchJson(`${API}/playlists`, {
+        method: "POST",
+        body: JSON.stringify({ name: trimmed }),
+      });
+      setPlaylists((prev) => [newPl, ...prev]);
+      setName("");
+    } catch (err) {
+      alert(`[Playlists] ${err.message}`);
+    }
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm("정말 삭제할까요?")) return;
+    try {
+      await fetchJson(`${API}/playlists/${id}`, { method: "DELETE" });
+      setPlaylists((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      alert(`[Playlists] 삭제 실패: ${err.message}`);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <section className="card">
+      <div className="card-header">
+        <div className="card-title">
+          <span>📂</span>
+          <span>
+            Playlists{" "}
+            <span className="card-badge">{playlists.length.toString()}</span>
+          </span>
+        </div>
+      </div>
+
+      <div className="card-toolbar">
+        <input
+          className="field-input"
+          placeholder="플레이리스트 이름"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <button className="btn btn-primary" onClick={handleAdd}>
+          ➕ 추가
+        </button>
+        <button className="btn btn-secondary" onClick={load}>
+          🔄 새로고침
+        </button>
+      </div>
+
+      {loading && <p className="text-muted">불러오는 중...</p>}
+      {error && (
+        <p className="text-error">
+          ⚠️ Error: <span>{error}</span>
+        </p>
+      )}
+
+      <ul className="list">
+        {playlists.map((p) => (
+          <li key={p.id} className="list-item">
+            <span>
+              <span className="text-muted">#{p.id} </span>
+              <strong>{p.name}</strong>
+            </span>
+            <button
+              className="btn btn-danger"
+              onClick={() => handleDelete(p.id)}
+            >
+              삭제
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* ---------- App Root ---------- */
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<ArtistsPage />} />
+          <Route path="/artists" element={<ArtistsPage />} />
+          <Route path="/songs" element={<SongsPage />} />
+          <Route path="/albums" element={<AlbumsPage />} />
+          <Route path="/playlists" element={<PlaylistsPage />} />
+        </Routes>
+      </Layout>
+    </BrowserRouter>
   );
 }

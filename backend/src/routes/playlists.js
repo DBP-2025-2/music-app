@@ -1,67 +1,117 @@
+// backend/src/routes/playlists.js
 import { Router } from "express";
-import db from "../store/db.js";
+import {
+  getPlaylists,
+  createPlaylist,
+  updatePlaylist,
+  deletePlaylist,
+  getPlaylistItems,
+  addPlaylistItem,
+  deletePlaylistItem,
+} from "../store/db.mysql.js";
 
 const router = Router();
 
-// 플레이리스트 목록
-router.get("/", (_req, res) => {
-  res.json(db.listPlaylists());
+// GET /playlists
+router.get("/", async (req, res, next) => {
+  try {
+    const playlists = await getPlaylists();
+    res.json(playlists);
+  } catch (err) {
+    next(err);
+  }
 });
 
-// 생성 { name }
-router.post("/", (req, res) => {
-  const { name } = req.body;
-  if (!name?.trim()) return res.status(400).json({ error: "name is required" });
-  const item = db.createPlaylist(name);
-  res.status(201).json(item);
+// POST /playlists
+router.post("/", async (req, res, next) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: "name is required" });
+    }
+    const playlist = await createPlaylist({ name: name.trim() });
+    res.status(201).json(playlist);
+  } catch (err) {
+    next(err);
+  }
 });
 
-// 수정 { name }
-router.patch("/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const { name } = req.body;
-  if (!name?.trim()) return res.status(400).json({ error: "name is required" });
-  const updated = db.updatePlaylist(id, name);
-  if (!updated) return res.status(404).json({ error: "not found" });
-  res.json(updated);
+// PATCH /playlists/:id
+router.patch("/:id", async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const { name } = req.body;
+    if (!id || !name || !name.trim()) {
+      return res.status(400).json({ error: "invalid data" });
+    }
+    const updated = await updatePlaylist(id, { name: name.trim() });
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
 });
 
-// 삭제
-router.delete("/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const ok = db.deletePlaylist(id);
-  if (!ok) return res.status(404).json({ error: "not found" });
-  res.status(204).end();
+// DELETE /playlists/:id
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) {
+      return res.status(400).json({ error: "invalid id" });
+    }
+    await deletePlaylist(id);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
 });
 
-// ===================== Items =====================
-
-// 특정 플레이리스트의 아이템 목록
-router.get("/:id/items", (req, res) => {
-  const id = Number(req.params.id);
-  const items = db.listPlaylistItems(id);
-  res.json(items);
+// GET /playlists/:id/items
+router.get("/:id/items", async (req, res, next) => {
+  try {
+    const playlistId = Number(req.params.id);
+    if (!playlistId) {
+      return res.status(400).json({ error: "invalid playlist id" });
+    }
+    const items = await getPlaylistItems(playlistId);
+    res.json(items);
+  } catch (err) {
+    next(err);
+  }
 });
 
-// 아이템 추가 { songId }
-router.post("/:id/items", (req, res) => {
-  const playlistId = Number(req.params.id);
-  const { songId } = req.body || {};
-  if (!songId) return res.status(400).json({ error: "songId is required" });
-  const { item, error } = db.addPlaylistItem({
-    playlistId,
-    songId: Number(songId),
-  });
-  if (error) return res.status(400).json({ error });
-  res.status(201).json(item);
+// POST /playlists/:id/items
+router.post("/:id/items", async (req, res, next) => {
+  try {
+    const playlistId = Number(req.params.id);
+    const { songId } = req.body;
+    if (!playlistId || !songId) {
+      return res.status(400).json({ error: "invalid playlistId or songId" });
+    }
+    const item = await addPlaylistItem({
+      playlistId,
+      songId: Number(songId),
+    });
+    res.status(201).json(item);
+  } catch (err) {
+    if (String(err.message).includes("이미 이 플레이리스트에 있는 곡입니다.")) {
+      return res.status(400).json({ error: err.message });
+    }
+    next(err);
+  }
 });
 
-// 아이템 삭제
-router.delete("/:id/items/:itemId", (req, res) => {
-  const itemId = Number(req.params.itemId);
-  const ok = db.removePlaylistItem(itemId);
-  if (!ok) return res.status(404).json({ error: "not found" });
-  res.status(204).end();
+// DELETE /playlists/:playlistId/items/:itemId
+router.delete("/:playlistId/items/:itemId", async (req, res, next) => {
+  try {
+    const itemId = Number(req.params.itemId);
+    if (!itemId) {
+      return res.status(400).json({ error: "invalid itemId" });
+    }
+    await deletePlaylistItem(itemId);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;
