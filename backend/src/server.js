@@ -13,6 +13,8 @@ import followsRouter from "./routes/follows.js";
 import playHistoryRouter from "./routes/playHistory.js";
 import usersRouter from "./routes/users.js";
 
+import { testConnection } from "./store/db.mysql.js";
+
 const app = express();
 
 // 🔧 공통 미들웨어
@@ -26,6 +28,20 @@ app.use(express.urlencoded({ extended: true }));
 app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
+
+
+app.get("/db-check", async (req, res) => {
+  try {
+    const ok = await testConnection();
+    res.json({ db: ok ? "connected" : "failed" });
+  } catch (e) {
+    res.status(500).json({
+      db: "failed",
+      error: String(e)
+    });
+  }
+});
+
 
 // 라우트
 app.use("/artists", artistsRouter);

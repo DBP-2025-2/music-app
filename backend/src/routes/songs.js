@@ -1,16 +1,19 @@
 // backend/src/routes/songs.js
 import { Router } from "express";
-import * as db from "../store/db.mysql.js";
+import {
+  getSongs,
+  createSong,
+  updateSong,
+  deleteSong,
+} from "../store/db.mysql.js";
 
 const router = Router();
 
-// GET /songs  (optional ?artistId=)
+// GET /songs  (?artistId=...&q=...)
 router.get("/", async (req, res, next) => {
   try {
-    const artistId = req.query.artistId
-      ? Number(req.query.artistId)
-      : undefined;
-    const songs = await db.getSongs(artistId ? { artistId } : undefined);
+    const { artistId, q } = req.query;
+    const songs = await getSongs({ artistId, q });
     res.json(songs);
   } catch (err) {
     next(err);
@@ -18,21 +21,16 @@ router.get("/", async (req, res, next) => {
 });
 
 // POST /songs
-// body: { title, artistId }
 router.post("/", async (req, res, next) => {
   try {
-    const { title, artistId } = req.body ?? {};
-
-    if (!title || !title.trim()) {
-      return res.status(400).json({ error: "title is required" });
+    const { title, artistId } = req.body;
+    if (!title || !title.trim() || !artistId) {
+      return res.status(400).json({ error: "title, artistId required" });
     }
-
-    const aId = Number(artistId);
-    if (!aId || aId <= 0) {
-      return res.status(400).json({ error: "artistId must be a valid number" });
-    }
-
-    const song = await db.createSong({ title, artistId: aId });
+    const song = await createSong({
+      title: title.trim(),
+      artistId: Number(artistId),
+    });
     res.status(201).json(song);
   } catch (err) {
     next(err);
@@ -40,22 +38,17 @@ router.post("/", async (req, res, next) => {
 });
 
 // PATCH /songs/:id
-// body: { title, artistId }
 router.patch("/:id", async (req, res, next) => {
   try {
     const id = Number(req.params.id);
-    const { title, artistId } = req.body ?? {};
-
-    if (!title || !title.trim()) {
-      return res.status(400).json({ error: "title is required" });
+    const { title, artistId } = req.body;
+    if (!id || !title || !title.trim() || !artistId) {
+      return res.status(400).json({ error: "invalid data" });
     }
-
-    const aId = Number(artistId);
-    if (!aId || aId <= 0) {
-      return res.status(400).json({ error: "artistId must be a valid number" });
-    }
-
-    const updated = await db.updateSong(id, { title, artistId: aId });
+    const updated = await updateSong(id, {
+      title: title.trim(),
+      artistId: Number(artistId),
+    });
     res.json(updated);
   } catch (err) {
     next(err);
@@ -66,7 +59,8 @@ router.patch("/:id", async (req, res, next) => {
 router.delete("/:id", async (req, res, next) => {
   try {
     const id = Number(req.params.id);
-    await db.deleteSong(id);
+    if (!id) return res.status(400).json({ error: "invalid id" });
+    await deleteSong(id);
     res.status(204).end();
   } catch (err) {
     next(err);

@@ -232,42 +232,46 @@ export async function deleteAlbum(id) {
 // Songs (+ song_artists 로 메인 아티스트 연결)
 // --------------------------------------------------------------------
 
-// GET /songs 또는 /songs?artistId=...
-export async function getSongs({ artistId } = {}) {
+// GET /songs 또는 /songs?artistId=...&q=...
+export async function getSongs({ artistId, q } = {}) {
+  const params = [];
+  const where = [];
+
+  // 아티스트 기준 필터
   if (artistId) {
-    const [rows] = await pool.query(
-      `
-      SELECT
-        s.${SONG_ID_COL}    AS id,
-        s.${SONG_TITLE_COL} AS title,
-        sa.${SA_ARTIST_ID_COL} AS artistId
-      FROM ${SONGS_TABLE} s
-      JOIN ${SONG_ARTISTS_TABLE} sa
-        ON s.${SONG_ID_COL} = sa.${SA_SONG_ID_COL}
-      WHERE sa.${SA_ARTIST_ID_COL} = ?
-        AND (sa.${SA_DISPLAY_ORDER_COL} = 1 OR sa.${SA_DISPLAY_ORDER_COL} IS NULL)
-      ORDER BY s.${SONG_ID_COL} DESC
-      `,
-      [artistId]
-    );
-    return rows;
-  } else {
-    const [rows] = await pool.query(
-      `
-      SELECT
-        s.${SONG_ID_COL}    AS id,
-        s.${SONG_TITLE_COL} AS title,
-        sa.${SA_ARTIST_ID_COL} AS artistId
-      FROM ${SONGS_TABLE} s
-      LEFT JOIN ${SONG_ARTISTS_TABLE} sa
-        ON s.${SONG_ID_COL} = sa.${SA_SONG_ID_COL}
-       AND (sa.${SA_DISPLAY_ORDER_COL} = 1 OR sa.${SA_DISPLAY_ORDER_COL} IS NULL)
-      ORDER BY s.${SONG_ID_COL} DESC
-      `
-    );
-    return rows;
+    where.push(`sa.${SA_ARTIST_ID_COL} = ?`);
+    params.push(artistId);
   }
+
+  // 제목 검색 (title_norm 사용, 소문자로 비교)
+  if (q) {
+    where.push(`s.title_norm LIKE ?`);
+    params.push(`%${q.toLowerCase()}%`);
+  }
+
+  const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+  const [rows] = await pool.query(
+    `
+    SELECT
+      s.${SONG_ID_COL}    AS id,
+      s.${SONG_TITLE_COL} AS title,
+      sa.${SA_ARTIST_ID_COL} AS artistId
+    FROM ${SONGS_TABLE} s
+    LEFT JOIN ${SONG_ARTISTS_TABLE} sa
+      ON s.${SONG_ID_COL} = sa.${SA_SONG_ID_COL}
+     AND (sa.${SA_DISPLAY_ORDER_COL} = 1 OR sa.${SA_DISPLAY_ORDER_COL} IS NULL)
+    ${whereClause}
+    ORDER BY s.${SONG_ID_COL} DESC
+    LIMIT 50
+    `,
+    params
+  );
+
+  return rows;
 }
+
+
 
 // POST /songs ({ title, artistId })
 export async function createSong({ title, artistId }) {
@@ -487,13 +491,16 @@ export async function getPlaylistItems(playlistId) {
   const [rows] = await pool.query(
     `
     SELECT
-      ${ITEM_ID_COL}          AS id,
-      ${ITEM_PLAYLIST_ID_COL} AS playlistId,
-      ${ITEM_SONG_ID_COL}     AS songId,
-      ${ITEM_POSITION_COL}    AS position
-    FROM ${PLAYLIST_ITEMS_TABLE}
-    WHERE ${ITEM_PLAYLIST_ID_COL} = ?
-    ORDER BY ${ITEM_POSITION_COL} ASC, ${ITEM_ID_COL} ASC
+      i.${ITEM_ID_COL}          AS id,
+      i.${ITEM_PLAYLIST_ID_COL} AS playlistId,
+      i.${ITEM_SONG_ID_COL}     AS songId,
+      i.${ITEM_POSITION_COL}    AS position,
+      s.${SONG_TITLE_COL}       AS songTitle
+    FROM ${PLAYLIST_ITEMS_TABLE} i
+    JOIN ${SONGS_TABLE} s
+      ON i.${ITEM_SONG_ID_COL} = s.${SONG_ID_COL}
+    WHERE i.${ITEM_PLAYLIST_ID_COL} = ?
+    ORDER BY i.${ITEM_POSITION_COL} ASC, i.${ITEM_ID_COL} ASC
     `,
     [playlistId]
   );
@@ -591,19 +598,17 @@ export async function getCharts() {
 
 // GET /follows
 export async function getFollows() {
-  const [rows] = await pool.query(
-    `
+  const [rows] = await pool.query(`
     SELECT
       follower_id  AS followerId,
       following_id AS followingId,
-      target_type  AS targetType,
       created_at   AS createdAt
-    FROM ${FOLLOWS_TABLE}
+    FROM follows
     ORDER BY created_at DESC
-    `
-  );
+  `);
   return rows;
 }
+
 
 // --------------------------------------------------------------------
 // Play History (READ-ONLY)
