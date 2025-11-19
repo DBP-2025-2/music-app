@@ -1,7 +1,7 @@
 # Music App v1 (music-app-version1)
 
 ---
-DB변경하여 railway에서 확인 부탁드립니다.
+DB 비밀번호 변경하여 railway에서 확인 부탁드립니다.
 
 ## 프로젝트 실행 방법 (Quick Start)
 
