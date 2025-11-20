@@ -16,17 +16,25 @@ export default function HomePage({ onLoginSuccess }) {
     setLoading(true);
 
     try {
+      const lowerEmail = email.toLowerCase().trim();
+      console.log("📤 HomePage: Logging in with:", {
+        email: lowerEmail,
+        password,
+      });
+
       const response = await fetchJson(`${API}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: lowerEmail, password }),
       });
 
+      console.log("✅ HomePage: Login response:", response);
       localStorage.setItem("authToken", response.token);
       setTimeout(() => {
         onLoginSuccess();
       }, 500);
     } catch (e) {
+      console.error("❌ HomePage: Login error:", e.message);
       setError("❌ " + e.message);
     } finally {
       setLoading(false);
@@ -124,14 +132,11 @@ export default function HomePage({ onLoginSuccess }) {
               </button>
             </form>
 
-            <div className="login-divider">또는</div>
-
-            <Link to="/register" className="btn-secondary">
-              새 계정 만들기
-            </Link>
-
             <p className="login-footer">
-              처음이신가요? <Link to="/register" className="link-text">회원가입</Link>
+              처음이신가요?{" "}
+              <Link to="/register" className="link-text">
+                회원가입
+              </Link>
             </p>
           </div>
         </div>

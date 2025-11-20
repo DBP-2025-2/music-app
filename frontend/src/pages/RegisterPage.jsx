@@ -17,16 +17,30 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
+      const lowerEmail = email.toLowerCase().trim();
+      console.log("📤 Registering with:", {
+        email: lowerEmail,
+        password,
+        nickname: nickname || null,
+      });
+
       const response = await fetchJson(`${API}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, nickname }),
+        body: JSON.stringify({
+          email: lowerEmail,
+          password,
+          nickname: nickname || null, // 빈 문자열 대신 null 전송
+        }),
       });
+
+      console.log("✅ Register response:", response);
 
       setTimeout(() => {
         navigate("/login");
       }, 1000);
     } catch (e) {
+      console.error("❌ Register error:", e.message);
       setError("❌ " + e.message);
     } finally {
       setLoading(false);
@@ -96,7 +110,10 @@ export default function RegisterPage() {
           </Link>
 
           <p className="register-footer">
-            이미 계정이 있으신가요? <Link to="/login" className="link-text">로그인</Link>
+            이미 계정이 있으신가요?{" "}
+            <Link to="/login" className="link-text">
+              로그인
+            </Link>
           </p>
         </div>
       </div>

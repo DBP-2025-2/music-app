@@ -15,18 +15,23 @@ export default function LoginPage({ onLoginSuccess }) {
     setLoading(true);
 
     try {
+      const lowerEmail = email.toLowerCase().trim();
+      console.log("📤 Logging in with:", { email: lowerEmail, password });
+
       const response = await fetchJson(`${API}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: lowerEmail, password }),
       });
 
+      console.log("✅ Login response:", response);
       localStorage.setItem("authToken", response.token);
 
       setTimeout(() => {
         onLoginSuccess();
       }, 500);
     } catch (e) {
+      console.error("❌ Login error:", e.message);
       setError("❌ " + e.message);
     } finally {
       setLoading(false);
@@ -84,7 +89,10 @@ export default function LoginPage({ onLoginSuccess }) {
           </Link>
 
           <p className="login-footer">
-            처음이신가요? <Link to="/register" className="link-text">회원가입</Link>
+            처음이신가요?{" "}
+            <Link to="/register" className="link-text">
+              회원가입
+            </Link>
           </p>
         </div>
       </div>

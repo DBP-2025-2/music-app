@@ -88,94 +88,135 @@ export default function ArtistsPage() {
   };
 
   return (
-    <div className="panel">
-      <div
-        className="row wrap"
-        style={{ justifyContent: "space-between", marginBottom: 12 }}
-      >
-        <h2 style={{ margin: 0 }}>
-          👤 Artists <span className="badge">{filtered.length}</span>
-        </h2>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="검색 (이름)"
-          style={{ minWidth: 220 }}
-        />
-      </div>
-
-      <form onSubmit={add} className="row" style={{ gap: 8, marginBottom: 12 }}>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="아티스트 이름"
-          style={{ flex: 1 }}
-        />
-        <button className="btn primary" disabled={!name.trim() || busy}>
-          ➕ 추가 {busy && <span className="spinner" />}
-        </button>
-        <button type="button" className="btn ghost" onClick={load}>
-          🔄 새로고침
-        </button>
-      </form>
-
-      {loading && <div className="empty">⏳ 불러오는 중…</div>}
-      {error && (
-        <div className="empty" style={{ color: "var(--danger)" }}>
-          ❗ {error}
+    <div className="content-page">
+      <div className="content-container">
+        <div className="page-header">
+          <h1 className="page-title">
+            👤 아티스트 <span className="badge">{filtered.length}</span>
+          </h1>
+          <button className="btn ghost" onClick={load} title="새로고침">
+            🔄 새로고침
+          </button>
         </div>
-      )}
-      {!loading && !error && filtered.length === 0 && (
-        <div className="empty">🙈 결과가 없어요</div>
-      )}
 
-      <div className="list">
-        {filtered.map((a) => (
-          <div
-            key={a.id}
-            className="item"
-            style={{ gridTemplateColumns: "1fr auto auto" }}
-          >
-            {editId === a.id ? (
-              <>
-                <input
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                />
-                <button className="btn success" onClick={() => save(a.id)}>
-                  💾 저장
-                </button>
-                <button
-                  className="btn muted"
-                  onClick={() => {
-                    setEditId(null);
-                    setEditName("");
-                  }}
-                >
-                  ↩️ 취소
-                </button>
-              </>
-            ) : (
-              <>
-                <div>
-                  #{a.id} — <b>{a.name}</b>
-                </div>
-                <button
-                  className="btn ghost"
-                  onClick={() => {
-                    setEditId(a.id);
-                    setEditName(a.name);
-                  }}
-                >
-                  ✏️ 수정
-                </button>
-                <button className="btn danger" onClick={() => remove(a.id)}>
-                  🗑️ 삭제
-                </button>
-              </>
-            )}
+        <div className="content-panel">
+          {/* 검색 */}
+          <div className="search-toolbar">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="🔍 아티스트 이름으로 검색..."
+              style={{ flex: 1 }}
+            />
           </div>
-        ))}
+
+          {/* 추가 폼 */}
+          <form onSubmit={add} className="add-form">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="새로운 아티스트 이름을 입력하세요"
+              style={{ flex: 1 }}
+            />
+            <button className="btn primary" disabled={!name.trim() || busy}>
+              {busy ? (
+                <>
+                  <span className="loading-spinner"></span> 추가 중...
+                </>
+              ) : (
+                <>➕ 추가</>
+              )}
+            </button>
+          </form>
+
+          {/* 에러 메시지 */}
+          {error && (
+            <div className="error-message">
+              <span>❗</span>
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* 로딩 상태 */}
+          {loading && (
+            <div className="empty-state">
+              <div className="empty-state-icon">⏳</div>
+              <div className="empty-state-text">아티스트를 불러오는 중...</div>
+            </div>
+          )}
+
+          {/* 빈 상태 */}
+          {!loading && !error && filtered.length === 0 && (
+            <div className="empty-state">
+              <div className="empty-state-icon">🎸</div>
+              <div className="empty-state-text">
+                {q ? "검색 결과가 없어요" : "아티스트를 추가해보세요!"}
+              </div>
+            </div>
+          )}
+
+          {/* 아티스트 목록 */}
+          {!loading && !error && filtered.length > 0 && (
+            <div className="items-grid">
+              {filtered.map((a) => (
+                <div key={a.id} className="item-card">
+                  {editId === a.id ? (
+                    <div className="edit-form">
+                      <input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="아티스트 이름"
+                      />
+                      <button
+                        className="btn success"
+                        onClick={() => save(a.id)}
+                        disabled={busy}
+                      >
+                        💾 저장
+                      </button>
+                      <button
+                        className="btn muted"
+                        onClick={() => {
+                          setEditId(null);
+                          setEditName("");
+                        }}
+                      >
+                        ↩️ 취소
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="item-card-header">
+                        <h3 className="item-card-title">{a.name}</h3>
+                      </div>
+                      <div className="item-card-meta">
+                        <span>🆔 #{a.id}</span>
+                      </div>
+                      <div className="item-card-actions">
+                        <button
+                          className="btn ghost"
+                          onClick={() => {
+                            setEditId(a.id);
+                            setEditName(a.name);
+                          }}
+                        >
+                          ✏️ 수정
+                        </button>
+                        <button
+                          className="btn danger"
+                          onClick={() => remove(a.id)}
+                          disabled={busy}
+                        >
+                          🗑️ 삭제
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

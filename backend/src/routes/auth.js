@@ -62,17 +62,28 @@ router.post("/register", async (req, res, next) => {
   try {
     const { email, password, nickname } = req.body;
 
+    console.log("[REGISTER] 요청 받음:", {
+      email,
+      password: password ? "***" : "없음",
+      nickname,
+    });
+
     if (!email || !password) {
+      console.log("[REGISTER] ❌ 이메일 또는 비밀번호 없음");
       return res.status(400).json({ error: "이메일과 비밀번호는 필수입니다." });
     }
 
     // 비밀번호 해싱
+    console.log("[REGISTER] 비밀번호 해싱 중...");
     const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("[REGISTER] 해시 완료:", hashedPassword.substring(0, 20));
 
     const [result] = await db.pool.query(
       "INSERT INTO users (email, password_hash, nickname) VALUES (?, ?, ?)",
       [email, hashedPassword, nickname || null]
     );
+
+    console.log("[REGISTER] ✅ 회원가입 성공, user_id:", result.insertId);
 
     res.status(201).json({
       message: "✅ 회원가입 성공!",
@@ -80,6 +91,7 @@ router.post("/register", async (req, res, next) => {
       email,
     });
   } catch (error) {
+    console.error("[REGISTER] ❌ 에러:", error.message);
     if (error.code === "ER_DUP_ENTRY") {
       return res.status(409).json({ error: "이미 사용 중인 이메일입니다." });
     }
@@ -92,7 +104,13 @@ router.post("/login", async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
+    console.log("[LOGIN] 요청 받음:", {
+      email,
+      password: password ? "***" : "없음",
+    });
+
     if (!email || !password) {
+      console.log("[LOGIN] ❌ 이메일 또는 비밀번호 없음");
       return res.status(400).json({ error: "이메일과 비밀번호를 입력하세요." });
     }
 
@@ -101,16 +119,23 @@ router.post("/login", async (req, res, next) => {
       [email]
     );
 
+    console.log("[LOGIN] DB 조회 결과:", rows.length, "명");
     if (rows.length === 0) {
+      console.log("[LOGIN] ❌ 사용자 없음:", email);
       return res
         .status(401)
         .json({ error: "이메일 또는 비밀번호가 잘못되었습니다." });
     }
 
     const user = rows[0];
+    console.log("[LOGIN] 사용자 찾음:", user.user_id, user.email);
+    console.log("[LOGIN] DB 해시 시작:", user.password_hash.substring(0, 20));
+
     const isPasswordMatch = await bcrypt.compare(password, user.password_hash);
+    console.log("[LOGIN] 비밀번호 매칭 결과:", isPasswordMatch);
 
     if (!isPasswordMatch) {
+      console.log("[LOGIN] ❌ 비밀번호 불일치");
       return res
         .status(401)
         .json({ error: "이메일 또는 비밀번호가 잘못되었습니다." });
@@ -126,6 +151,8 @@ router.post("/login", async (req, res, next) => {
       { expiresIn: "1h" }
     );
 
+    console.log("[LOGIN] ✅ 로그인 성공");
+
     await db.pool.query(
       "UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE user_id = ?",
       [user.user_id]
@@ -136,6 +163,7 @@ router.post("/login", async (req, res, next) => {
       token,
     });
   } catch (error) {
+    console.error("[LOGIN] ❌ 에러:", error.message);
     next(error);
   }
 });

@@ -18,6 +18,7 @@ export default function AlbumsPage() {
   const [sort, setSort] = useState("year-desc"); // 최신 우선
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   const artistNameById = useMemo(() => {
     const m = new Map();
@@ -26,14 +27,20 @@ export default function AlbumsPage() {
   }, [artists]);
 
   const loadAll = async () => {
-    setLoading(true);
-    const [a, s] = await Promise.all([
-      fetchJson(`${API}/artists`),
-      fetchJson(`${API}/albums`),
-    ]);
-    setArtists(a);
-    setAlbums(s);
-    setLoading(false);
+    try {
+      setError("");
+      setLoading(true);
+      const [a, s] = await Promise.all([
+        fetchJson(`${API}/artists`),
+        fetchJson(`${API}/albums`),
+      ]);
+      setArtists(a);
+      setAlbums(s);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -104,143 +111,197 @@ export default function AlbumsPage() {
   const remove = async (id) => {
     if (!confirm("삭제할까요?")) return;
     setBusy(true);
-    await fetchJson(`${API}/albums/${id}`, { method: "DELETE" });
-    await loadAll();
-    setBusy(false);
+    try {
+      await fetchJson(`${API}/albums/${id}`, { method: "DELETE" });
+      await loadAll();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <div className="panel">
-      <div
-        className="row wrap"
-        style={{ justifyContent: "space-between", marginBottom: 12 }}
-      >
-        <h2 style={{ margin: 0 }}>
-          💿 Albums <span className="badge">{albums.length}</span>
-        </h2>
-        <div className="row">
-          <select value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="year-desc">연도 최신순</option>
-            <option value="year-asc">연도 오래된순</option>
-            <option value="title-asc">제목 ↑</option>
-            <option value="title-desc">제목 ↓</option>
-          </select>
-          <button className="btn ghost" onClick={loadAll}>
-            🔄 새로고침
+    <div className="content-page">
+      <div className="content-container">
+        <div className="page-header">
+          <h1 className="page-title">
+            💿 앨범 <span className="badge">{sorted.length}</span>
+          </h1>
+          <button className="btn ghost" onClick={loadAll} title="새로고침">
+            � 새로고침
           </button>
         </div>
-      </div>
 
-      <form onSubmit={add} className="row" style={{ gap: 8, marginBottom: 12 }}>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="앨범 제목"
-          style={{ flex: 2 }}
-        />
-        <select
-          value={artistId}
-          onChange={(e) => setArtistId(e.target.value)}
-          style={{ flex: 1 }}
-        >
-          <option value="">아티스트 선택</option>
-          {artists.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-        <input
-          value={year}
-          onChange={(e) => setYear(e.target.value)}
-          placeholder="연도(선택)"
-          inputMode="numeric"
-          style={{ width: 120 }}
-        />
-        <button
-          className="btn primary"
-          disabled={!title.trim() || !artistId || busy}
-        >
-          ➕ 추가 {busy && <span className="spinner" />}
-        </button>
-      </form>
-
-      {loading && <div className="empty">⏳ 불러오는 중…</div>}
-
-      <div className="list">
-        {sorted.map((a) => (
-          <div
-            key={a.id}
-            className="item"
-            style={{ gridTemplateColumns: "1fr auto auto auto auto" }}
-          >
-            {editId === a.id ? (
-              <>
-                <input
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                />
-                <select
-                  value={editArtistId}
-                  onChange={(e) => setEditArtistId(e.target.value)}
-                >
-                  <option value="">아티스트</option>
-                  {artists.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  value={editYear}
-                  onChange={(e) => setEditYear(e.target.value)}
-                  placeholder="연도"
-                  inputMode="numeric"
-                />
-                <button className="btn success" onClick={() => save(a.id)}>
-                  💾 저장
-                </button>
-                <button
-                  className="btn muted"
-                  onClick={() => {
-                    setEditId(null);
-                    setEditTitle("");
-                    setEditArtistId("");
-                    setEditYear("");
-                  }}
-                >
-                  ↩️ 취소
-                </button>
-              </>
-            ) : (
-              <>
-                <div>
-                  <b>{a.title}</b> <small>({a.year ?? "—"})</small>
-                  <br />
-                  <small>
-                    by{" "}
-                    {artistNameById.get(a.artistId) || `artistId:${a.artistId}`}{" "}
-                    · #{a.id}
-                  </small>
-                </div>
-                <button
-                  className="btn ghost"
-                  onClick={() => {
-                    setEditId(a.id);
-                    setEditTitle(a.title);
-                    setEditArtistId(String(a.artistId));
-                    setEditYear(a.year ?? "");
-                  }}
-                >
-                  ✏️ 수정
-                </button>
-                <button className="btn danger" onClick={() => remove(a.id)}>
-                  🗑️ 삭제
-                </button>
-              </>
-            )}
+        <div className="content-panel">
+          {/* 정렬 */}
+          <div className="search-toolbar">
+            <select value={sort} onChange={(e) => setSort(e.target.value)}>
+              <option value="year-desc">📅 연도 (최신순)</option>
+              <option value="year-asc">📅 연도 (오래된순)</option>
+              <option value="title-asc">📝 제목 (오름차순)</option>
+              <option value="title-desc">📝 제목 (내림차순)</option>
+            </select>
           </div>
-        ))}
+
+          {/* 추가 폼 */}
+          <form onSubmit={add} className="add-form">
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="앨범 제목을 입력하세요"
+              style={{ flex: 1.5 }}
+            />
+            <select
+              value={artistId}
+              onChange={(e) => setArtistId(e.target.value)}
+              style={{ flex: 1 }}
+            >
+              <option value="">아티스트 선택</option>
+              {artists.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            <input
+              value={year}
+              onChange={(e) => setYear(e.target.value)}
+              placeholder="연도 (선택사항)"
+              inputMode="numeric"
+              type="number"
+              min="1900"
+              max={new Date().getFullYear()}
+              style={{ flex: 0.8 }}
+            />
+            <button
+              className="btn primary"
+              disabled={!title.trim() || !artistId || busy}
+            >
+              {busy ? (
+                <>
+                  <span className="loading-spinner"></span> 추가 중...
+                </>
+              ) : (
+                <>➕ 추가</>
+              )}
+            </button>
+          </form>
+
+          {/* 에러 메시지 */}
+          {error && (
+            <div className="error-message">
+              <span>❗</span>
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* 로딩 상태 */}
+          {loading && (
+            <div className="empty-state">
+              <div className="empty-state-icon">⏳</div>
+              <div className="empty-state-text">앨범을 불러오는 중...</div>
+            </div>
+          )}
+
+          {/* 빈 상태 */}
+          {!loading && !error && sorted.length === 0 && (
+            <div className="empty-state">
+              <div className="empty-state-icon">💿</div>
+              <div className="empty-state-text">앨범을 추가해보세요!</div>
+            </div>
+          )}
+
+          {/* 앨범 목록 */}
+          {!loading && !error && sorted.length > 0 && (
+            <div className="items-grid">
+              {sorted.map((a) => (
+                <div key={a.id} className="item-card">
+                  {editId === a.id ? (
+                    <div className="edit-form">
+                      <input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        placeholder="앨범 제목"
+                      />
+                      <select
+                        value={editArtistId}
+                        onChange={(e) => setEditArtistId(e.target.value)}
+                      >
+                        <option value="">아티스트 선택</option>
+                        {artists.map((x) => (
+                          <option key={x.id} value={x.id}>
+                            {x.name}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        value={editYear}
+                        onChange={(e) => setEditYear(e.target.value)}
+                        placeholder="연도"
+                        inputMode="numeric"
+                        type="number"
+                        min="1900"
+                        max={new Date().getFullYear()}
+                      />
+                      <button
+                        className="btn success"
+                        onClick={() => save(a.id)}
+                        disabled={busy}
+                      >
+                        💾 저장
+                      </button>
+                      <button
+                        className="btn muted"
+                        onClick={() => {
+                          setEditId(null);
+                          setEditTitle("");
+                          setEditArtistId("");
+                          setEditYear("");
+                        }}
+                      >
+                        ↩️ 취소
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="item-card-header">
+                        <h3 className="item-card-title">{a.title}</h3>
+                      </div>
+                      <div className="item-card-meta">
+                        <span>🆔 #{a.id}</span>
+                        <span>
+                          👤 {artistNameById.get(a.artistId) || "Unknown"}
+                        </span>
+                        <span>📅 {a.year || "—"}</span>
+                      </div>
+                      <div className="item-card-actions">
+                        <button
+                          className="btn ghost"
+                          onClick={() => {
+                            setEditId(a.id);
+                            setEditTitle(a.title);
+                            setEditArtistId(String(a.artistId));
+                            setEditYear(a.year ?? "");
+                          }}
+                        >
+                          ✏️ 수정
+                        </button>
+                        <button
+                          className="btn danger"
+                          onClick={() => remove(a.id)}
+                          disabled={busy}
+                        >
+                          🗑️ 삭제
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
