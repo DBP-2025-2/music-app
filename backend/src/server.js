@@ -2,6 +2,8 @@
 import express from "express";
 import morgan from "morgan";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import artistsRouter from "./routes/artists.js";
 import albumsRouter from "./routes/albums.js";
@@ -12,14 +14,20 @@ import chartsRouter from "./routes/charts.js";
 import followsRouter from "./routes/follows.js";
 import playHistoryRouter from "./routes/playHistory.js";
 import usersRouter from "./routes/users.js";
+import authRouter from "./routes/auth.js";
 
-import { testConnection } from "./store/db.mysql.js";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
 // 🔧 공통 미들웨어
 app.use(morgan("dev"));
 app.use(cors());
+// EJS 설정
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "../views"));
+app.use(express.static(path.join(__dirname, "../../frontend/public")));
 // ❗ JSON body 파싱 (이게 없으면 req.body 가 undefined)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -28,20 +36,6 @@ app.use(express.urlencoded({ extended: true }));
 app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
-
-
-app.get("/db-check", async (req, res) => {
-  try {
-    const ok = await testConnection();
-    res.json({ db: ok ? "connected" : "failed" });
-  } catch (e) {
-    res.status(500).json({
-      db: "failed",
-      error: String(e)
-    });
-  }
-});
-
 
 // 라우트
 app.use("/artists", artistsRouter);
@@ -54,6 +48,26 @@ app.use("/charts", chartsRouter);
 app.use("/follows", followsRouter);
 app.use("/play-history", playHistoryRouter);
 app.use("/users", usersRouter);
+app.use("/auth", authRouter); // 인증 라우트
+
+// 페이지 라우트 (EJS)
+app.get("/register", (req, res) => {
+  try {
+    res.render("register");
+  } catch (error) {
+    console.error("페이지 렌더링 오류:/register", error);
+    res.status(500).send("페이지를 불러오는 데 실패했습니다.");
+  }
+});
+
+app.get("/login", (req, res) => {
+  try {
+    res.render("login");
+  } catch (error) {
+    console.error("페이지 렌더링 오류:/login", error);
+    res.status(500).send("페이지를 불러오는 데 실패했습니다.");
+  }
+});
 
 // 에러 핸들러
 app.use((err, req, res, next) => {

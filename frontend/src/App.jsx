@@ -1,4 +1,5 @@
 // frontend/src/App.jsx
+import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import ArtistsPage from "./pages/ArtistsPage";
 import SongsPage from "./pages/SongsPage";
@@ -8,10 +9,12 @@ import ChartsPage from "./pages/ChartsPage";
 import FollowsPage from "./pages/FollowsPage";
 import HistoryPage from "./pages/HistoryPage";
 import UsersPage from "./pages/UsersPage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
 
 /* ---------- 공통 레이아웃 ---------- */
 
-function Layout({ children }) {
+function Layout({ children, isLoggedIn, onLogout }) {
   return (
     <>
       <header className="app-header">
@@ -84,6 +87,11 @@ function Layout({ children }) {
           >
             Users
           </NavLink>
+          {isLoggedIn && (
+            <button className="nav-link logout-btn" onClick={onLogout}>
+              🚪 로그아웃
+            </button>
+          )}
         </nav>
       </header>
 
@@ -95,23 +103,56 @@ function Layout({ children }) {
 /* ---------- App Root ---------- */
 
 export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    // 페이지 로드 시 토큰 확인
+    const token = localStorage.getItem("authToken");
+    setIsLoggedIn(!!token);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    setIsLoggedIn(false);
+  };
+
+  const handleLoginSuccess = () => {
+    setIsLoggedIn(true);
+  };
+
   return (
     <BrowserRouter>
-      <Layout>
+      {isLoggedIn ? (
+        <Layout isLoggedIn={isLoggedIn} onLogout={handleLogout}>
+          <Routes>
+            <Route path="/" element={<ArtistsPage />} />
+            <Route path="/artists" element={<ArtistsPage />} />
+            <Route path="/songs" element={<SongsPage />} />
+            <Route path="/albums" element={<AlbumsPage />} />
+            <Route path="/playlists" element={<PlaylistsPage />} />
+            <Route path="/charts" element={<ChartsPage />} />
+            <Route path="/follows" element={<FollowsPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/users" element={<UsersPage />} />
+          </Routes>
+        </Layout>
+      ) : (
         <Routes>
-          <Route path="/" element={<ArtistsPage />} />
-          <Route path="/artists" element={<ArtistsPage />} />
-          <Route path="/songs" element={<SongsPage />} />
-          <Route path="/albums" element={<AlbumsPage />} />
-          <Route path="/playlists" element={<PlaylistsPage />} />
-          <Route path="/charts" element={<ChartsPage />} />
-          <Route path="/follows" element={<FollowsPage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="/users" element={<UsersPage />} />
-          {/* 404 fallback 원하면 추가 */}
-          {/* <Route path="*" element={<ArtistsPage />} /> */}
+          <Route
+            path="/"
+            element={<LoginPage onLoginSuccess={handleLoginSuccess} />}
+          />
+          <Route
+            path="/login"
+            element={<LoginPage onLoginSuccess={handleLoginSuccess} />}
+          />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route
+            path="*"
+            element={<LoginPage onLoginSuccess={handleLoginSuccess} />}
+          />
         </Routes>
-      </Layout>
+      )}
     </BrowserRouter>
   );
 }

@@ -93,6 +93,9 @@ export async function testConnection() {
   return rows[0].ok === 1;
 }
 
+// pool export (auth 등 다른 라우트에서 사용 가능)
+export { pool };
+
 // --------------------------------------------------------------------
 // Artists
 // --------------------------------------------------------------------
@@ -270,8 +273,6 @@ export async function getSongs({ artistId, q } = {}) {
 
   return rows;
 }
-
-
 
 // POST /songs ({ title, artistId })
 export async function createSong({ title, artistId }) {
@@ -608,7 +609,6 @@ export async function getFollows() {
   `);
   return rows;
 }
-
 
 // --------------------------------------------------------------------
 // Play History (READ-ONLY)
