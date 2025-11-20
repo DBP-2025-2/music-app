@@ -8,13 +8,11 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    setMessage("");
     setError("");
     setLoading(true);
 
@@ -25,11 +23,9 @@ export default function RegisterPage() {
         body: JSON.stringify({ email, password, nickname }),
       });
 
-      setMessage("✅ " + response.message);
-
       setTimeout(() => {
         navigate("/login");
-      }, 1500);
+      }, 1000);
     } catch (e) {
       setError("❌ " + e.message);
     } finally {
@@ -38,48 +34,71 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-form">
-        <h2>🎵 회원가입</h2>
-        <form onSubmit={handleRegister}>
-          <div className="form-group">
-            <label htmlFor="email">이메일:</label>
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+    <div className="register-page">
+      <div className="gradient-background"></div>
+      <div className="register-container">
+        <div className="register-card">
+          <div className="register-card-header">
+            <h2>🎵 회원가입</h2>
+            <p>당신의 음악 여정을 시작하세요</p>
           </div>
-          <div className="form-group">
-            <label htmlFor="password">비밀번호:</label>
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="nickname">닉네임:</label>
-            <input
-              type="text"
-              id="nickname"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-            />
-          </div>
-          <button type="submit" disabled={loading}>
-            {loading ? "가입 중..." : "가입하기"}
-          </button>
-        </form>
-        {message && <p className="message success">{message}</p>}
-        {error && <p className="message error">{error}</p>}
-        <p className="auth-link">
-          이미 계정이 있으신가요? <Link to="/login">로그인</Link>
-        </p>
+
+          <form onSubmit={handleRegister} className="register-form">
+            <div className="form-group">
+              <label htmlFor="email">이메일</label>
+              <input
+                type="email"
+                id="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="password">비밀번호</label>
+              <input
+                type="password"
+                id="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="nickname">닉네임 (선택사항)</label>
+              <input
+                type="text"
+                id="nickname"
+                placeholder="your nickname"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+
+            {error && <p className="form-error">{error}</p>}
+
+            <button type="submit" className="btn-submit" disabled={loading}>
+              {loading ? "가입 중..." : "회원가입"}
+            </button>
+          </form>
+
+          <div className="register-divider">또는</div>
+
+          <Link to="/login" className="btn-secondary">
+            기존 계정으로 로그인
+          </Link>
+
+          <p className="register-footer">
+            이미 계정이 있으신가요? <Link to="/login" className="link-text">로그인</Link>
+          </p>
+        </div>
       </div>
     </div>
   );

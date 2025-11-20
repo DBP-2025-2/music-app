@@ -1,6 +1,7 @@
 // frontend/src/App.jsx
 import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
+import HomePage from "./pages/HomePage";
 import ArtistsPage from "./pages/ArtistsPage";
 import SongsPage from "./pages/SongsPage";
 import AlbumsPage from "./pages/AlbumsPage";
@@ -140,7 +141,7 @@ export default function App() {
         <Routes>
           <Route
             path="/"
-            element={<LoginPage onLoginSuccess={handleLoginSuccess} />}
+            element={<HomePage onLoginSuccess={handleLoginSuccess} />}
           />
           <Route
             path="/login"
@@ -149,7 +150,7 @@ export default function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route
             path="*"
-            element={<LoginPage onLoginSuccess={handleLoginSuccess} />}
+            element={<HomePage onLoginSuccess={handleLoginSuccess} />}
           />
         </Routes>
       )}
