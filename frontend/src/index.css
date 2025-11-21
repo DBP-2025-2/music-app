@@ -1002,3 +1002,292 @@ button {
     font-size: 22px;
   }
 }
+
+
+.charts-page {
+  padding: 32px 56px 48px;
+}
+
+.charts-header-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.charts-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 4px;
+}
+
+.charts-subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.charts-date-range {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.charts-filters {
+  display: flex;
+  gap: 8px;
+}
+
+.charts-select {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 6px 16px;
+  background: rgba(16, 24, 40, 0.7);
+  color: #ffffff;
+  font-size: 13px;
+  outline: none;
+}
+
+.charts-select:focus {
+  border-color: #a855f7;
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.5);
+}
+
+/* 카드 */
+
+.charts-card {
+  margin-top: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 20px;
+  padding: 16px 20px 20px;
+  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.35);
+}
+
+.charts-error {
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #e11d48;
+}
+
+.charts-loading {
+  padding: 40px 0;
+  text-align: center;
+  color: #6b7280;
+}
+
+/* 헤더 라인 */
+
+.charts-table-header {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 2.5fr) minmax(0, 1.6fr) minmax(0, 2fr) 90px 90px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.charts-table-body {
+  margin-top: 4px;
+}
+
+/* 각 행 */
+
+.charts-row {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 2.5fr) minmax(0, 1.6fr) minmax(0, 2fr) 90px 90px;
+  align-items: center;
+  padding: 10px 12px;
+  column-gap: 12px;
+  font-size: 14px;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.charts-row:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(168, 85, 247, 0.06),
+    rgba(236, 72, 153, 0.02)
+  );
+}
+
+/* 컬럼 공통 */
+
+.col-rank {
+  font-weight: 600;
+  color: #4b5563;
+  text-align: center;
+}
+
+.col-title {
+  overflow: hidden;
+}
+
+.col-artist,
+.col-album {
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.song-title {
+  font-weight: 500;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.song-artist {
+  font-size: 13px;
+}
+
+.song-album {
+  font-size: 13px;
+}
+
+/* 좋아요 버튼 */
+
+.col-like,
+.col-playlist {
+  display: flex;
+  justify-content: center;
+}
+
+.like-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: none;                  /* 🔥 검은 테두리 제거 */
+  background: #f5f3ff;           /* 연보라 배경 */
+  font-size: 10px;
+  color: #6b21a8;                /* 보라 텍스트 */
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.like-button:hover {
+  background: #ede9fe;
+}
+
+.like-button--active {
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  color: #ffffff;
+}
+
+.like-count {
+  min-width: 30px;
+  text-align: center;
+}
+
+/* 플리 추가 버튼 */
+
+.playlist-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 16px rgba(168, 85, 247, 0.35);
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.playlist-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(168, 85, 247, 0.45);
+}
+
+/* 빈 상태 */
+
+.charts-empty {
+  padding: 32px 0;
+  text-align: center;
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+/* Chart 페이지 상단 타이틀 */
+.chart-hero-title {
+  width: 100%;
+  text-align: center;
+  margin: 200px 0 10px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.chart-hero-title h1 {
+  font-size: 90px;
+  font-weight: 800;
+  background: linear-gradient(90deg, #A06BFF 0%, #6C52FF 50%, #A06BFF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+/* 차트 카드 */
+.charts-card {
+  max-width: 1100px;
+  margin: 0 auto;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 24px 32px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+/* Top 10 강조 */
+.charts-row--top10 {
+  background: linear-gradient(
+    90deg,
+    rgba(129, 140, 248, 0.16),
+    rgba(236, 72, 153, 0.08)
+  );
+}
+
+.charts-row--top10:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(129, 140, 248, 0.22),
+    rgba(236, 72, 153, 0.12)
+  );
+}
+
+/* 좋아요 버튼 */
+.like-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: #f5f3ff;
+  color: #6b21a8;
+  transition: background 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.like-button--active {
+  background: linear-gradient(90deg, #f97373, #fb3c8d);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(248, 113, 113, 0.4);
+}
+
+.like-button:hover {
+  transform: translateY(-1px);
+}
+
+.like-count {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+

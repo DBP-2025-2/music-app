@@ -15,6 +15,7 @@ import followsRouter from "./routes/follows.js";
 import playHistoryRouter from "./routes/playHistory.js";
 import usersRouter from "./routes/users.js";
 import authRouter from "./routes/auth.js";
+import likesRoutes from "./routes/likes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,6 +50,7 @@ app.use("/follows", followsRouter);
 app.use("/play-history", playHistoryRouter);
 app.use("/users", usersRouter);
 app.use("/auth", authRouter); // 인증 라우트
+app.use("/likes", likesRoutes);
 
 // 페이지 라우트 (EJS)
 app.get("/register", (req, res) => {
