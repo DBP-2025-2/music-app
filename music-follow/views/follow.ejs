@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title><%= title %></title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f4f9; }
+        
+        h1 { color: #333; text-align: center; margin-bottom: 30px; }
+        
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #f1f1f1; padding-bottom: 10px; }
+        h3 { margin: 0; color: #444; font-size: 1.1rem; }
+
+        .form-group { display: flex; gap: 10px; }
+        input, select { padding: 12px; border: 1px solid #ddd; border-radius: 6px; flex: 1; font-size: 0.95rem; }
+        
+        button { padding: 10px 20px; cursor: pointer; border: none; border-radius: 6px; font-weight: 600; transition: 0.2s; }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-primary:hover { background-color: #0056b3; }
+        .btn-danger { background-color: #ff4d4d; color: white; font-size: 0.8rem; padding: 6px 12px; }
+        .btn-danger:hover { background-color: #cc0000; }
+        .btn-refresh { background-color: transparent; color: #666; font-size: 1.2rem; padding: 5px; }
+        .btn-refresh:hover { color: #007bff; background-color: #f1f1f1; border-radius: 50%; }
+
+
+        ul { list-style: none; padding: 0; margin: 0; }
+        li { background: #fff; border-bottom: 1px solid #eee; padding: 15px 5px; display: flex; justify-content: space-between; align-items: center; }
+        li:last-child { border-bottom: none; }
+        
+        .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; color: white; font-weight: bold; margin-right: 12px; letter-spacing: 0.5px; }
+        .badge.user { background-color: #20c997; }
+        .badge.artist { background-color: #7950f2; } 
+        
+        .empty-msg { text-align: center; color: #aaa; padding: 30px; font-style: italic; }
+    </style>
+</head>
+<body>
+
+    <h1>🎵 Follow Manager</h1>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>➕ 팔로우 하기</h3>
+        </div>
+        <div class="form-group">
+            <select id="targetType" style="flex: 0.3;" onchange="toggleInputPlaceholder()">
+                <option value="user">유저</option>
+                <option value="artist">아티스트</option>
+            </select>
+            <input type="text" id="targetInput" placeholder="닉네임 입력">
+            <button class="btn-primary" onclick="followTarget()">추가</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>📋 팔로우 목록</h3>
+            <button class="btn-refresh" onclick="loadFollows()" title="새로고침">↻</button>
+        </div>
+        <ul id="followList">
+            <li class="empty-msg">데이터를 불러오는 중...</li>
+        </ul>
+    </div>
+
+    <script>
+        const API_URL = '/api/follows';
+
+        // 입력창 힌트 자동 변경
+        function toggleInputPlaceholder() {
+            const type = document.getElementById('targetType').value;
+            const input = document.getElementById('targetInput');
+            input.placeholder = type === 'user' ? "상대방 닉네임 (예: 테스트유저2)" : "아티스트 이름 (예: NewJeans)";
+        }
+
+        // 목록 불러오기 
+        async function loadFollows() {
+            const listEl = document.getElementById('followList');
+            try {
+                const res = await fetch(`${API_URL}/list`);
+                const data = await res.json();
+
+                listEl.innerHTML = ''; 
+
+                if (!data.follows || data.follows.length === 0) {
+                    listEl.innerHTML = '<li class="empty-msg">팔로우한 내역이 없습니다.</li>';
+                    return;
+                }
+
+                data.follows.forEach(item => {
+                    const li = document.createElement('li');
+                    const typeClass = item.target_type === 'user' ? 'user' : 'artist';
+                    const displayName = item.target_name ? item.target_name : `ID: ${item.following_id}`;
+
+                    li.innerHTML = `
+                        <div>
+                            <span class="badge ${typeClass}">${item.target_type.toUpperCase()}</span>
+                            <strong style="color:#333; font-size:1.05rem;">${displayName}</strong>
+                        </div>
+                        <button class="btn-danger" onclick="unfollow('${item.following_id}', '${item.target_type}')">삭제</button>
+                    `;
+                    listEl.appendChild(li);
+                });
+            } catch (err) {
+                listEl.innerHTML = '<li class="empty-msg" style="color:red">서버 연결 실패</li>';
+            }
+        }
+
+        // 팔로우 요청
+        async function followTarget() {
+            const targetType = document.getElementById('targetType').value;
+            const targetInput = document.getElementById('targetInput').value;
+
+            if (!targetInput.trim()) return alert("대상을 입력하세요.");
+
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target_input: targetInput, target_type: targetType })
+                });
+                
+                const result = await res.json();
+                if (res.ok) {
+                    loadFollows(); // 성공 시 목록 자동 갱신
+                    document.getElementById('targetInput').value = ''; 
+                } else {
+                    alert(result.message);
+                }
+            } catch (err) {
+                alert("서버 오류");
+            }
+        }
+
+        // 언팔로우 요청
+        async function unfollow(followingId, targetType) {
+            if (!confirm("삭제하시겠습니까?")) return;
+            
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ following_id: followingId, target_type: targetType })
+                });
+                if (res.ok) loadFollows();
+            } catch (err) {
+                alert("오류 발생");
+            }
+        }
+        
+        // 시작하자마자 실행
+        window.onload = () => {
+            toggleInputPlaceholder();
+            loadFollows(); 
+        };
+    </script>
+</body>
+</html>

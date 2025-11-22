@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title><%= title %></title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 380px; margin: 0 auto; padding: 20px; background: #f0f2f5; }
+        
+        h1 { text-align: center; color: #333; font-size: 1.2rem; margin-bottom: 20px; }
+        p.user-info { text-align: center; color: #666; font-size: 0.85rem; margin-top: -15px; margin-bottom: 20px; }
+
+        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 15px; position: relative; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px; }
+        h3 { margin: 0; color: #444; font-size: 0.95rem; }
+
+        .search-box { position: relative; flex: 1; }
+        
+        input.search-input {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            box-sizing: border-box; 
+        }
+
+        .search-results {
+            position: absolute;
+            top: 100%; 
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 0 0 6px 6px;
+            max-height: 200px; 
+            overflow-y: auto;
+            z-index: 100; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: none; 
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .search-item {
+            padding: 10px;
+            border-bottom: 1px solid #f5f5f5;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .search-item:hover { background-color: #f0f8ff; color: #007bff; }
+        .search-item strong { color: #333; display: block; }
+        .search-item small { color: #888; }
+        
+        button.btn-play { 
+            background: #ff4757; color: white; 
+            border: none; border-radius: 6px; 
+            font-weight: bold; cursor: pointer; 
+            padding: 8px 15px; font-size: 0.8rem;
+            margin-left: 5px;
+            height: 35px; 
+        }
+        button.btn-play:hover { background: #ff6b81; }
+        button.btn-refresh { background: #2ed573; color: white; border:none; border-radius:4px; cursor:pointer; }
+
+        ul#historyList { list-style: none; padding: 0; margin: 0; }
+        ul#historyList li { padding: 10px 5px; border-bottom: 1px solid #f1f1f1; display: flex; justify-content: space-between; align-items: center; }
+        
+        .song-info { display: flex; flex-direction: column; }
+        .song-title { font-weight: bold; color: #333; font-size: 0.9rem; }
+        .artist-name { font-size: 0.75rem; color: #666; margin-top: 2px; }
+        .time { font-size: 0.7rem; color: #aaa; }
+        .empty-msg { text-align: center; color: #aaa; padding: 15px; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+    <h1>🎧 Play History</h1>
+    <p class="user-info">Login: <strong><%= user.nickname %></strong></p>
+
+    <div class="card">
+        <div class="header">
+            <h3>🎵 Now Playing</h3>
+        </div>
+        <div style="display: flex; align-items: flex-start;">
+            <div class="search-box">
+                <input type="text" id="searchInput" class="search-input" placeholder="노래 제목이나 가수를 검색하세요" autocomplete="off">
+                
+                <input type="hidden" id="selectedSongId">
+                
+                <ul id="searchResults" class="search-results"></ul>
+            </div>
+
+            <button class="btn-play" onclick="playSong()">▶ 재생</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="header">
+            <h3>🕒 최근 기록</h3>
+            <button class="btn-refresh" onclick="loadHistory()">↻</button>
+        </div>
+        <ul id="historyList">
+            <li class="empty-msg">로딩 중...</li>
+        </ul>
+    </div>
+
+    <script>
+        let allSongs = []; 
+
+        window.onload = () => {
+            fetchSongs();  // 노래 데이터 미리 가져오기
+            loadHistory(); // 기록 가져오기
+        };
+
+        //전체 노래 목록 가져오기
+        async function fetchSongs() {
+            try {
+                const res = await fetch('/api/history/songs');
+                const data = await res.json();
+                allSongs = data.songs; 
+            } catch (err) {
+                console.error("노래 로딩 실패");
+            }
+        }
+
+        // 검색 기능 (입력할 때마다 실행)
+        const searchInput = document.getElementById('searchInput');
+        const resultsBox = document.getElementById('searchResults');
+
+        searchInput.addEventListener('input', function() {
+            const query = this.value.trim().toLowerCase();
+            
+            if (query.length === 0) {
+                resultsBox.style.display = 'none';
+                return;
+            }
+
+            const matches = allSongs.filter(s => 
+                s.title.toLowerCase().includes(query) || 
+                s.artist.toLowerCase().includes(query)
+            );
+
+            renderSearchResults(matches);
+        });
+
+        // 검색 결과 화면에 그리기
+        function renderSearchResults(matches) {
+            resultsBox.innerHTML = '';
+            
+            if (matches.length === 0) {
+                resultsBox.style.display = 'none';
+                return;
+            }
+
+            matches.forEach(song => {
+                const li = document.createElement('li');
+                li.className = 'search-item';
+                li.innerHTML = `
+                    <strong>${song.title}</strong>
+                    <small>${song.artist}</small>
+                `;
+                li.onclick = () => selectSong(song);
+                resultsBox.appendChild(li);
+            });
+
+            resultsBox.style.display = 'block'; 
+        }
+
+        // 노래 선택 시 실행
+        function selectSong(song) {
+            document.getElementById('searchInput').value = `${song.title} - ${song.artist}`;
+            document.getElementById('selectedSongId').value = song.song_id;
+            resultsBox.style.display = 'none';
+        }
+
+        // 재생 기록 목록 불러오기 (기존과 동일)
+        async function loadHistory() {
+            const list = document.getElementById('historyList');
+            const res = await fetch('/api/history/list');
+            const data = await res.json();
+
+            list.innerHTML = '';
+            if (data.history.length === 0) {
+                list.innerHTML = '<li class="empty-msg">기록이 없습니다.</li>';
+                return;
+            }
+
+            data.history.forEach(h => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <div class="song-info">
+                        <span class="song-title">${h.title}</span>
+                        <span class="artist-name">${h.artist_name}</span>
+                    </div>
+                    <span class="time">${new Date(h.played_at).toLocaleString()}</span>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        async function playSong() {
+            const songId = document.getElementById('selectedSongId').value;
+    
+            if (!songId) {
+                return alert("검색해서 노래를 선택해주세요!");
+            }
+
+            try {
+                const res = await fetch('/api/history', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ song_id: songId })
+                });
+        
+                const result = await res.json(); 
+        
+                if (res.ok) {
+                    loadHistory();
+                } else {
+                    alert("실패 원인: " + result.message); 
+                }
+        
+            }catch (e) { alert("오류"); }
+        }
+
+        document.addEventListener('click', function(e) {
+            if (!document.querySelector('.search-box').contains(e.target)) {
+                resultsBox.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
