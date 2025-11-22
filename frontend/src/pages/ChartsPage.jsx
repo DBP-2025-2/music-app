@@ -11,6 +11,16 @@ export default function ChartsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+    // ─────────────────────────────
+  // 플리 선택 모달 (차트 → 플리추가)
+  // ─────────────────────────────
+  const [playlistPickerOpen, setPlaylistPickerOpen] = useState(false);
+  const [playlistPickerLoading, setPlaylistPickerLoading] = useState(false);
+  const [playlistPickerError, setPlaylistPickerError] = useState("");
+  const [myPlaylists, setMyPlaylists] = useState([]);
+  const [targetSongId, setTargetSongId] = useState(null);
+
+
   // 연도별 인기곡
   const [yearlyTop, setYearlyTop] = useState([]);
   const [selectedYearForTop, setSelectedYearForTop] = useState(null);
@@ -173,9 +183,42 @@ export default function ChartsPage() {
     }
   };
 
-  const handleAddToPlaylist = (songId) => {
-    console.log("플리 추가 예정:", songId);
+  const handleAddToPlaylist = async (songId) => {
+    try {
+      setTargetSongId(songId);
+      setPlaylistPickerOpen(true);
+      setPlaylistPickerError("");
+      setPlaylistPickerLoading(true);
+
+      const data = await fetchJson("/playlists"); // 내 플레이리스트 목록
+      setMyPlaylists(data);
+    } catch (e) {
+      console.error(e);
+      setPlaylistPickerError(
+        e.message || "플레이리스트 목록을 불러오는데 실패했습니다."
+      );
+    } finally {
+      setPlaylistPickerLoading(false);
+    }
   };
+
+  const handleSelectPlaylistForSong = async (playlistId) => {
+    if (!targetSongId) return;
+
+    try {
+      await fetchJson(`/playlists/${playlistId}/items`, {
+        method: "POST",
+        body: JSON.stringify({ songId: targetSongId }),
+      });
+      alert("플레이리스트에 곡이 추가되었습니다. 🎵");
+      setPlaylistPickerOpen(false);
+      setTargetSongId(null);
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "플레이리스트에 곡을 추가하는 데 실패했습니다.");
+    }
+  };
+
 
   /* -------------------------------------------------------------------------- */
   /*  렌더링                                                                    */
@@ -488,6 +531,71 @@ export default function ChartsPage() {
           )}
         </div>
       )}
+      {/* ====== 플레이리스트 선택 모달 ====== */}
+      {playlistPickerOpen && (
+        <div className="playlist-modal-backdrop">
+          <div className="playlist-modal">
+            <h3 className="playlist-modal-title">플레이리스트에 추가</h3>
+
+            {playlistPickerLoading && (
+              <p className="text-muted">플레이리스트 불러오는 중...</p>
+            )}
+
+            {playlistPickerError && (
+              <p className="text-error">⚠ {playlistPickerError}</p>
+            )}
+
+            {!playlistPickerLoading && myPlaylists.length === 0 && (
+              <p className="text-muted">
+                아직 생성된 플레이리스트가 없습니다. <br />
+                먼저 플레이리스트를 만들어 주세요.
+              </p>
+            )}
+
+            {!playlistPickerLoading && myPlaylists.length > 0 && (
+              <ul className="playlist-modal-list">
+                {myPlaylists.map((pl) => {
+                  const isPublic = pl.isPublic ?? pl.is_public ?? true;
+                  return (
+                    <li key={pl.id} className="playlist-modal-item">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectPlaylistForSong(pl.id)}
+                      >
+                        <span className="playlist-modal-name">
+                          #{pl.id} {pl.name}
+                        </span>
+                        <span
+                          className={
+                            "playlist-modal-badge " +
+                            (isPublic
+                              ? "playlist-modal-badge--public"
+                              : "playlist-modal-badge--private")
+                          }
+                        >
+                          {isPublic ? "공개" : "비공개"}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            <button
+              type="button"
+              className="playlist-modal-close"
+              onClick={() => {
+                setPlaylistPickerOpen(false);
+                setTargetSongId(null);
+              }}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

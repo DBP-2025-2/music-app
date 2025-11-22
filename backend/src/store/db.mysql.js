@@ -407,50 +407,152 @@ export async function deleteSong(id) {
 // Playlists
 // --------------------------------------------------------------------
 
-// 지금은 로그인 기능이 없으니까, 임시로 user_id=1, is_public=1 사용
-const DEFAULT_USER_ID = 1;
+// 이미 있는 상수들 그대로 두고, Playlists 쪽 함수들만 이렇게 맞춰줘
 
-// GET /playlists
-export async function getPlaylists() {
+// GET /playlists  → 내 플레이리스트
+export async function getPlaylists(userId) {
   const [rows] = await pool.query(
     `
     SELECT
       ${PLAYLIST_ID_COL}   AS id,
-      ${PLAYLIST_NAME_COL} AS name
+      ${PLAYLIST_NAME_COL} AS name,
+      ${PLAYLIST_IS_PUBLIC_COL} AS isPublic,
+      note                 AS note
     FROM ${PLAYLISTS_TABLE}
+    WHERE ${PLAYLIST_USER_ID_COL} = ?
     ORDER BY ${PLAYLIST_ID_COL} DESC
-    `
+    `,
+    [userId]
   );
   return rows;
 }
 
 // POST /playlists
-export async function createPlaylist({ name }) {
+export async function createPlaylist({ userId, name, isPublic = true, note = "" }) {
   const [result] = await pool.query(
     `
     INSERT INTO ${PLAYLISTS_TABLE}
-      (${PLAYLIST_USER_ID_COL}, ${PLAYLIST_NAME_COL}, ${PLAYLIST_IS_PUBLIC_COL})
-    VALUES (?, ?, 1)
+      (${PLAYLIST_USER_ID_COL}, ${PLAYLIST_NAME_COL}, ${PLAYLIST_IS_PUBLIC_COL}, note)
+    VALUES (?, ?, ?, ?)
     `,
-    [DEFAULT_USER_ID, name]
+    [userId, name, isPublic ? 1 : 0, note]
   );
 
-  return { id: result.insertId, name };
+  return {
+    id: result.insertId,
+    name,
+    isPublic,
+    note,
+  };
 }
 
-// PATCH /playlists/:id
-export async function updatePlaylist(id, { name }) {
+// PATCH /playlists/:id  (이름 + 소개글까지 수정 가능하게)
+export async function updatePlaylist(id, { name, note, isPublic }) {
   await pool.query(
     `
     UPDATE ${PLAYLISTS_TABLE}
-    SET ${PLAYLIST_NAME_COL} = ?
+    SET
+      ${PLAYLIST_NAME_COL}   = ?,
+      note                   = ?,
+      ${PLAYLIST_IS_PUBLIC_COL} = ?
     WHERE ${PLAYLIST_ID_COL} = ?
     `,
-    [name, id]
+    [name, note ?? "", isPublic ? 1 : 0, id]
   );
 
-  return { id, name };
+  return { id, name, note, isPublic };
 }
+
+export async function searchPublicPlaylists({ q }) {
+  const params = [];
+  let where = `WHERE p.${PLAYLIST_IS_PUBLIC_COL} = 1`;
+
+  if (q && q.trim()) {
+    where += ` AND (p.${PLAYLIST_NAME_COL} LIKE ? OR p.note LIKE ?)`;
+    const like = `%${q.trim()}%`;
+    params.push(like, like);
+  }
+
+  const [rows] = await pool.query(
+    `
+    SELECT
+      p.${PLAYLIST_ID_COL}      AS id,
+      p.${PLAYLIST_NAME_COL}    AS name,
+      p.note                    AS note,
+      u.nickname                AS ownerNickname,
+      COUNT(DISTINCT pi.${ITEM_ID_COL}) AS trackCount,
+      COALESCE(f.followers, 0)  AS followerCount
+    FROM ${PLAYLISTS_TABLE} p
+    JOIN ${USERS_TABLE} u
+      ON u.${USER_ID_COL} = p.${PLAYLIST_USER_ID_COL}
+    LEFT JOIN ${PLAYLIST_ITEMS_TABLE} pi
+      ON pi.${ITEM_PLAYLIST_ID_COL} = p.${PLAYLIST_ID_COL}
+    LEFT JOIN (
+      SELECT
+        following_id,
+        COUNT(DISTINCT follower_id) AS followers
+      FROM ${FOLLOWS_TABLE}
+      WHERE target_type = 'playlist'
+      GROUP BY following_id
+    ) f
+      ON f.following_id = p.${PLAYLIST_ID_COL}
+    ${where}
+    GROUP BY
+      p.${PLAYLIST_ID_COL},
+      p.${PLAYLIST_NAME_COL},
+      p.note,
+      u.nickname,
+      f.followers
+    ORDER BY p.${PLAYLIST_ID_COL} DESC
+    `,
+    params
+  );
+
+  return rows;
+}
+
+// 팔로우 수 기준 상위 공개 플레이리스트
+export async function getPopularPublicPlaylists({ limit = 50 } = {}) {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      p.${PLAYLIST_ID_COL}      AS id,
+      p.${PLAYLIST_NAME_COL}    AS name,
+      p.note                    AS note,
+      u.nickname                AS ownerNickname,
+      COUNT(DISTINCT pi.${ITEM_ID_COL}) AS trackCount,
+      COALESCE(f.followers, 0)  AS followerCount
+    FROM ${PLAYLISTS_TABLE} p
+    JOIN ${USERS_TABLE} u
+      ON u.${USER_ID_COL} = p.${PLAYLIST_USER_ID_COL}
+    LEFT JOIN ${PLAYLIST_ITEMS_TABLE} pi
+      ON pi.${ITEM_PLAYLIST_ID_COL} = p.${PLAYLIST_ID_COL}
+    LEFT JOIN (
+      SELECT
+        following_id,
+        COUNT(DISTINCT follower_id) AS followers
+      FROM ${FOLLOWS_TABLE}
+      WHERE target_type = 'playlist'
+      GROUP BY following_id
+    ) f
+      ON f.following_id = p.${PLAYLIST_ID_COL}
+    WHERE p.${PLAYLIST_IS_PUBLIC_COL} = 1
+    GROUP BY
+      p.${PLAYLIST_ID_COL},
+      p.${PLAYLIST_NAME_COL},
+      p.note,
+      u.nickname,
+      f.followers
+    ORDER BY followerCount DESC, p.${PLAYLIST_ID_COL} DESC
+    LIMIT ?
+    `,
+    [limit]
+  );
+
+  return rows;
+}
+
+
 
 // DELETE /playlists/:id
 export async function deletePlaylist(id) {
@@ -565,11 +667,6 @@ export async function deletePlaylistItem(id) {
 // --------------------------------------------------------------------
 
 // GET /charts
-// --------------------------------------------------------------------
-// Charts  (READ-ONLY)
-// --------------------------------------------------------------------
-
-// GET /charts
 export async function getCharts() {
   // 1) SQL은 그냥 * 으로 다 가져오고
   const [rows] = await pool.query(
@@ -604,7 +701,7 @@ export async function getFollows() {
       follower_id  AS followerId,
       following_id AS followingId,
       created_at   AS createdAt
-    FROM follows
+    FROM ${FOLLOWS_TABLE}
     ORDER BY created_at DESC
   `);
   return rows;
