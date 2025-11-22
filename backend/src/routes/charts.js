@@ -54,39 +54,49 @@ router.get("/weekly", authMiddleware, async (req, res, next) => {
       SELECT
         c.rank,
         s.song_id,
-        s.title      AS song_title,
-        a.name       AS artist_name,
-        al.title     AS album_title,
+        s.title  AS song_title,
+        ar.name  AS artist_name,
+        al.title AS album_title,
 
-        -- ✅ 총 좋아요 수: likes 테이블 개수
-        COUNT(DISTINCT l.like_id) AS total_likes,
+        -- 🔹 곡별 총 좋아요 수 (중복 제거 후 카운트)
+        COALESCE(l.total_likes, 0) AS total_likes,
 
-        -- ✅ 내가 좋아요 눌렀는지 여부 (0 or 1)
-        MAX(
-          CASE
-            WHEN l.user_id = ? THEN 1
-            ELSE 0
-          END
-        ) AS user_liked
+        -- 🔹 현재 유저가 좋아요 눌렀는지만 체크 (중복 있어도 0/1)
+        CASE WHEN ul.user_id IS NULL THEN 0 ELSE 1 END AS user_liked
 
       FROM charts c
-      JOIN songs s        ON c.song_id = s.song_id
-      LEFT JOIN albums al ON s.album_id = al.album_id
-      LEFT JOIN song_artists sa ON sa.song_id = s.song_id
-      LEFT JOIN artists a ON a.artist_id = sa.artist_id
+      JOIN songs s
+        ON c.song_id = s.song_id
+      LEFT JOIN albums al
+        ON s.album_id = al.album_id
 
-      -- 🔁 여기! song_likes 가 아니라 likes
-      LEFT JOIN likes l ON l.song_id = s.song_id
+      -- ✅ 대표 아티스트 한 명만 (듀엣 뻥튀기 방지)
+      LEFT JOIN song_artists sa
+        ON sa.song_id = s.song_id
+       AND sa.display_order = 1
+      LEFT JOIN artists ar
+        ON ar.artist_id = sa.artist_id
+
+      -- ✅ 곡별 총 좋아요 수 서브쿼리 (중복 likes도 합쳐서 한 줄)
+      LEFT JOIN (
+        SELECT song_id, COUNT(DISTINCT like_id) AS total_likes
+        FROM likes
+        GROUP BY song_id
+      ) l
+        ON l.song_id = s.song_id
+
+      -- ✅ 유저별 좋아요도 서브쿼리로 1줄만 남기기
+      LEFT JOIN (
+        SELECT song_id, user_id
+        FROM likes
+        GROUP BY song_id, user_id
+      ) ul
+        ON ul.song_id = s.song_id
+       AND ul.user_id = ?
 
       WHERE c.chart_type = ?
         AND c.year       = ?
         AND c.week       = ?
-      GROUP BY
-        c.rank,
-        s.song_id,
-        s.title,
-        a.name,
-        al.title
       ORDER BY c.rank ASC
       `,
       [userId, type, Number(year), Number(week)]
@@ -98,5 +108,53 @@ router.get("/weekly", authMiddleware, async (req, res, next) => {
   }
 });
 
+router.get("/top-liked", authMiddleware, async (req, res, next) => {
+  try {
+    const { year } = req.query;
+    if (!year) {
+      return res.status(400).json({ error: "year 쿼리 파라미터가 필요합니다." });
+    }
+
+    const userId = req.user?.userId ?? null;
+
+    const [rows] = await db.pool.query(
+      `
+      SELECT
+        s.song_id,
+        s.title                  AS song_title,
+        a.name                   AS artist_name,
+        al.title                 AS album_title,
+        COUNT(DISTINCT l.like_id) AS total_likes,
+        MAX(
+          CASE
+            WHEN l.user_id = ? THEN 1
+            ELSE 0
+          END
+        )                        AS user_liked
+      FROM charts c
+      JOIN songs s          ON c.song_id = s.song_id
+      LEFT JOIN song_artists sa ON sa.song_id = s.song_id
+      LEFT JOIN artists a   ON a.artist_id = sa.artist_id
+      LEFT JOIN albums al   ON s.album_id = al.album_id
+      LEFT JOIN likes l     ON l.song_id = s.song_id
+      WHERE c.year = ?
+      GROUP BY
+        s.song_id,
+        s.title,
+        a.name,
+        al.title
+      ORDER BY
+        total_likes DESC,
+        MIN(c.rank) ASC
+      LIMIT 100
+      `,
+      [userId, Number(year)]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;

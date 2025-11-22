@@ -11,8 +11,21 @@ export default function ChartsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // 연도별 인기곡
+  const [yearlyTop, setYearlyTop] = useState([]);
+  const [selectedYearForTop, setSelectedYearForTop] = useState(null);
+  const [yearlyLoading, setYearlyLoading] = useState(false);
+  const [yearlyError, setYearlyError] = useState("");
+
+  // 뷰 모드: 주간 차트 / 연도별 TOP
+  const [viewMode, setViewMode] = useState("weekly"); // "weekly" | "yearly"
+
+  // 페이지네이션 (20개씩)
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+
   /* -------------------------------------------------------------------------- */
-  /*  🔹 차트 기간 목록 불러오기                                               */
+  /*  차트 기간 목록 불러오기                                                   */
   /* -------------------------------------------------------------------------- */
   useEffect(() => {
     (async () => {
@@ -30,7 +43,7 @@ export default function ChartsPage() {
   }, []);
 
   /* -------------------------------------------------------------------------- */
-  /*  🔹 선택된 기간의 차트 데이터 가져오기                                   */
+  /*  선택된 기간의 차트 데이터 가져오기                                       */
   /* -------------------------------------------------------------------------- */
   useEffect(() => {
     if (!selectedYear || !selectedWeek) return;
@@ -43,6 +56,7 @@ export default function ChartsPage() {
           `/charts/weekly?year=${selectedYear}&week=${selectedWeek}&type=weekly`
         );
         setEntries(data);
+        setPage(1); // 기간 바뀌면 1페이지로 리셋
       } catch (e) {
         setError(e.message);
       } finally {
@@ -65,6 +79,30 @@ export default function ChartsPage() {
     [periods]
   );
 
+
+  /* -------------------------------------------------------------------------- */
+  /*  연도별 인기곡 데이터 가져오기                                            */
+  /* -------------------------------------------------------------------------- */
+  useEffect(() => {
+    if (!selectedYearForTop) return;
+
+    (async () => {
+      try {
+        setYearlyLoading(true);
+        setYearlyError("");
+        const data = await fetchJson(
+          `/charts/top-liked?year=${selectedYearForTop}`
+        );
+        setYearlyTop(data);
+      } catch (e) {
+        setYearlyError(e.message);
+        setYearlyTop([]);
+      } finally {
+        setYearlyLoading(false);
+      }
+    })();
+  }, [selectedYearForTop]);
+
   const weeksForYear = useMemo(
     () =>
       periods
@@ -75,7 +113,28 @@ export default function ChartsPage() {
   );
 
   /* -------------------------------------------------------------------------- */
-  /*  🔹 좋아요 Toggle                                                          */
+  /*  페이지네이션 계산                                                        */
+  /* -------------------------------------------------------------------------- */
+  const totalPages = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
+  const pagedEntries = useMemo(
+    () =>
+      entries.slice(
+        (page - 1) * PAGE_SIZE,
+        (page - 1) * PAGE_SIZE + PAGE_SIZE
+      ),
+    [entries, page]
+  );
+
+  const handlePrevPage = () => {
+    setPage((p) => Math.max(1, p - 1));
+  };
+
+  const handleNextPage = () => {
+    setPage((p) => Math.min(totalPages, p + 1));
+  };
+
+  /* -------------------------------------------------------------------------- */
+  /*  좋아요 Toggle (주간 + 연도별 둘 다 반영)                                  */
   /* -------------------------------------------------------------------------- */
   const handleLikeToggle = async (songId) => {
     try {
@@ -84,8 +143,21 @@ export default function ChartsPage() {
         body: JSON.stringify({ songId }),
       });
 
-      // UI 즉시 반영
+      // 주간 차트 업데이트
       setEntries((prev) =>
+        prev.map((e) =>
+          e.song_id === songId
+            ? {
+                ...e,
+                user_liked: result.liked ? 1 : 0,
+                total_likes: e.total_likes + (result.liked ? 1 : -1),
+              }
+            : e
+        )
+      );
+
+      // 연도별 TOP도 같이 반영
+      setYearlyTop((prev) =>
         prev.map((e) =>
           e.song_id === songId
             ? {
@@ -106,11 +178,41 @@ export default function ChartsPage() {
   };
 
   /* -------------------------------------------------------------------------- */
-  /*  🔹 렌더링                                                                 */
+  /*  렌더링                                                                    */
   /* -------------------------------------------------------------------------- */
 
   return (
     <div className="charts-page">
+      {/* ====== 연도 타임라인 (연도별 TOP 선택용) ====== */}
+      <div className="charts-year-timeline">
+        <div className="charts-year-timeline-header">
+          <h2 className="charts-year-title">연도별 인기순위</h2>
+          <p className="charts-year-desc">
+            좋아요 TOP 20 
+          </p>
+        </div>
+
+        <div className="charts-year-line" />
+        {years.map((y) => {
+          const active = y === selectedYearForTop;
+          return (
+            <button
+              key={y}
+              className={
+                "year-timeline-item" +
+                (active ? " year-timeline-item--active" : "")
+              }
+              onClick={() => {
+                setSelectedYearForTop(y);
+                setViewMode("yearly"); // 연도 클릭 시 연도별 TOP 뷰로 전환
+              }}
+            >
+              <span className="year-timeline-dot" />
+              <span className="year-timeline-label">{y}년</span>
+            </button>
+          );
+        })}
+      </div>
 
       {/* 상단 가운데 Music Hub 타이틀 */}
       <div className="chart-hero-title">
@@ -120,116 +222,272 @@ export default function ChartsPage() {
       {/* 타이틀 + 기간 선택 */}
       <div className="charts-header-row">
         <div>
-          <h1 className="charts-title">Charts</h1>
+          <h1 className="charts-title">
+            {viewMode === "weekly" ? "Charts" : "Yearly Top 20"}
+          </h1>
 
-          {currentPeriod && (
+          {viewMode === "weekly" && currentPeriod && (
             <p className="charts-subtitle">
               weekly · {currentPeriod.year}년 {currentPeriod.week}주차{" "}
               <span className="charts-date-range">
-                ({currentPeriod.week_start_date} ~ {currentPeriod.week_end_date})
+                ({currentPeriod.week_start_date} ~{" "}
+                {currentPeriod.week_end_date})
               </span>
             </p>
           )}
+
+          {viewMode === "yearly" && selectedYearForTop && (
+            <>
+              <p className="charts-subtitle">
+                {selectedYearForTop}년 좋아요 TOP 20
+              </p>
+              {/* 🔙 연도별 차트에서 메인 주간 차트로 돌아가는 버튼 */}
+              <button
+                type="button"
+                className="charts-back-btn"
+                onClick={() => {
+                  setViewMode("weekly") 
+                  setSelectedYearForTop(null); 
+              }}
+            >
+                메인 주간 차트로 돌아가기
+              </button>
+            </>
+          )}
         </div>
 
-        {/* 연/주차 선택 */}
-        <div className="charts-filters">
-          <select
-            className="charts-select"
-            value={selectedYear ?? ""}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}년
-              </option>
-            ))}
-          </select>
+        {/* ✅ 주간 차트일 때만 연/주차 셀렉트 보여주기 */}
+        {viewMode === "weekly" && (
+          <div className="charts-filters">
+            <select
+              className="charts-select"
+              value={selectedYear ?? ""}
+              onChange={(e) => {
+                const newYear = Number(e.target.value);
+                setSelectedYear(newYear);
+                setViewMode("weekly");
 
-          <select
-            className="charts-select"
-            value={selectedWeek ?? ""}
-            onChange={(e) => setSelectedWeek(Number(e.target.value))}
-          >
-            {weeksForYear.map((w) => (
-              <option key={w} value={w}>
-                {w}주차
-              </option>
-            ))}
-          </select>
-        </div>
+                const firstWeekForYear =
+                  periods
+                    .filter((p) => p.year === newYear)
+                    .map((p) => p.week)
+                    .sort((a, b) => a - b)[0] ?? null;
+
+                setSelectedWeek(firstWeekForYear);
+                setPage(1); // 페이지도 1로 리셋
+              }}
+            >
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}년
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="charts-select"
+              value={selectedWeek ?? ""}
+              onChange={(e) => {
+                setSelectedWeek(Number(e.target.value));
+                setViewMode("weekly");
+              }}
+            >
+              {weeksForYear.map((w) => (
+                <option key={w} value={w}>
+                  {w}주차
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
-      {/* 메인 카드 박스 */}
-      <div className="charts-card">
-        {error && <div className="charts-error">⚠️ {error}</div>}
-        {loading && <div className="charts-loading">차트 불러오는 중...</div>}
+      {/* ====== 주간 차트 카드 ====== */}
+      {viewMode === "weekly" && (
+        <div className="charts-card">
+          {error && <div className="charts-error">⚠️ {error}</div>}
+          {loading && (
+            <div className="charts-loading">차트 불러오는 중...</div>
+          )}
 
-        {!loading && (
-          <>
-            {/* 테이블 헤더 */}
-            <div className="charts-table-header">
-              <span className="col-rank">순위</span>
-              <span className="col-title">곡명</span>
-              <span className="col-artist">가수</span>
-              <span className="col-album">앨범</span>
-              <span className="col-like">좋아요</span>
-              <span className="col-playlist">플리추가</span>
+          {!loading && (
+            <>
+              {/* 테이블 헤더 */}
+              <div className="charts-table-header">
+                <span className="col-rank">순위</span>
+                <span className="col-title">곡명</span>
+                <span className="col-artist">가수</span>
+                <span className="col-album">앨범</span>
+                <span className="col-like">좋아요</span>
+                <span className="col-playlist">플리추가</span>
+              </div>
+
+              {/* 테이블 바디 (20개씩) */}
+              <div className="charts-table-body">
+                {pagedEntries.map((item, index) => {
+                  const globalRank =
+                    (page - 1) * PAGE_SIZE + (index + 1);
+
+                  return (
+                    <div
+                      key={item.song_id}
+                      className={
+                        "charts-row" +
+                        (globalRank <= 10 ? " charts-row--top10" : "")
+                      }
+                    >
+                      <div className="col-rank">{globalRank}</div>
+
+                      <div className="col-title">
+                        <div className="song-title">
+                          {item.song_title}
+                        </div>
+                      </div>
+
+                      <div className="col-artist">
+                        {item.artist_name}
+                      </div>
+
+                      <div className="col-album">
+                        {item.album_title}
+                      </div>
+
+                      {/* 좋아요 버튼 */}
+                      <div className="col-like">
+                        <button
+                          onClick={() => handleLikeToggle(item.song_id)}
+                          className={`like-button ${
+                            item.user_liked
+                              ? "like-button--active"
+                              : ""
+                          }`}
+                        >
+                          <HeartIcon
+                            filled={item.user_liked}
+                            size={20}
+                          />
+                          <span className="like-count">
+                            {item.total_likes}
+                          </span>
+                        </button>
+                      </div>
+
+                      {/* 플리추가 버튼 */}
+                      <div className="col-playlist">
+                        <button
+                          className="playlist-button"
+                          onClick={() =>
+                            handleAddToPlaylist(item.song_id)
+                          }
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {entries.length === 0 && (
+                  <div className="charts-empty">
+                    차트 데이터가 없습니다.
+                  </div>
+                )}
+              </div>
+
+              {/* 페이지네이션 */}
+              {entries.length > 0 && (
+                <div className="charts-pagination">
+                  <button
+                    className="charts-page-btn"
+                    onClick={handlePrevPage}
+                    disabled={page === 1}
+                  >
+                    ← 이전 20곡
+                  </button>
+                  <span className="charts-page-info">
+                    {page} / {totalPages} 페이지
+                  </span>
+                  <button
+                    className="charts-page-btn"
+                    onClick={handleNextPage}
+                    disabled={page === totalPages}
+                  >
+                    다음 20곡 →
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ====== 연도별 인기곡 섹션 ====== */}
+      {viewMode === "yearly" && (
+        <div className="charts-card yearly-card">
+          <div className="charts-table-header">
+            <span className="col-rank">연도 TOP</span>
+            <span className="col-title">곡명</span>
+            <span className="col-artist">가수</span>
+            <span className="col-album">앨범</span>
+            <span className="col-like">좋아요</span>
+          </div>
+
+          {yearlyError && (
+            <div className="charts-error">⚠ {yearlyError}</div>
+          )}
+
+          {yearlyLoading ? (
+            <div className="charts-loading">
+              {selectedYearForTop}년 인기곡 불러오는 중...
             </div>
-
-            {/* 테이블 바디 */}
+          ) : (
             <div className="charts-table-body">
-              {entries.map((item) => (
-                <div
-                 key={item.rank}
-                 className={
-                  "charts-row" + (item.rank <= 10 ? " charts-row--top10" : "")
-                  }
-                >
-                  <div className="col-rank">{item.rank}</div>
-
+              {yearlyTop.slice(0, 20).map((item, index) => (
+                <div key={item.song_id} className="charts-row">
+                  <div className="col-rank">{index + 1}</div>
                   <div className="col-title">
-                    <div className="song-title">{item.song_title}</div>
+                    <div className="song-title">
+                      {item.song_title}
+                    </div>
+                  </div>
+                  <div className="col-artist">
+                    {item.artist_name}
+                  </div>
+                  <div className="col-album">
+                    {item.album_title}
                   </div>
 
-                  <div className="col-artist">{item.artist_name}</div>
-
-                  <div className="col-album">{item.album_title}</div>
-
-                  {/* 좋아요 버튼 */}
                   <div className="col-like">
                     <button
                       onClick={() => handleLikeToggle(item.song_id)}
-                      className={`like-button ${
-                        item.user_liked
-                          ? "like-button--active"
-                          : ""
-                      }`}
+                      className={
+                        "like-button" +
+                        (item.user_liked
+                          ? " like-button--active"
+                          : "")
+                      }
                     >
-                      <HeartIcon filled={item.user_liked} size={20} />
-                      <span className="like-count">{item.total_likes}</span>
-                    </button>
-                  </div>
-
-                  {/* 플리추가 버튼 */}
-                  <div className="col-playlist">
-                    <button
-                      className="playlist-button"
-                      onClick={() => handleAddToPlaylist(item.song_id)}
-                    >
-                      +
+                      <HeartIcon
+                        filled={item.user_liked}
+                        size={20}
+                      />
+                      <span className="like-count">
+                        {item.total_likes}
+                      </span>
                     </button>
                   </div>
                 </div>
               ))}
 
-              {entries.length === 0 && (
-                <div className="charts-empty">차트 데이터가 없습니다.</div>
+              {yearlyTop.length === 0 && (
+                <div className="charts-empty">
+                  {selectedYearForTop}년 좋아요 데이터가 없습니다.
+                </div>
               )}
             </div>
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

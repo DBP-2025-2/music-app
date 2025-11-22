@@ -12,6 +12,7 @@ import HistoryPage from "./pages/HistoryPage";
 import UsersPage from "./pages/UsersPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import ChartsYearPage from "./pages/ChartsYearPage";
 
 /* ---------- 공통 레이아웃 ---------- */
 
@@ -135,6 +136,8 @@ export default function App() {
             <Route path="/follows" element={<FollowsPage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/users" element={<UsersPage />} />
+            <Route path="/charts" element={<ChartsPage />} />
+            <Route path="/charts/year/:year" element={<ChartsYearPage />} />
           </Routes>
         </Layout>
       ) : (

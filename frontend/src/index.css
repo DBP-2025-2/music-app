@@ -57,7 +57,7 @@ button {
 }
 
 .app-main {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 32px 20px 60px;
 }
@@ -1006,6 +1006,9 @@ button {
 
 .charts-page {
   padding: 32px 56px 48px;
+  max-width: 1400px;   /* 🔥 차트 전체 폭 증가 */
+  margin: 0 auto;      /* 중앙 정렬 */
+  width: 100%;
 }
 
 .charts-header-row {
@@ -1016,7 +1019,7 @@ button {
 }
 
 .charts-title {
-  font-size: 32px;
+  font-size: 0px;
   font-weight: 700;
   color: #ffffff;
   margin-bottom: 4px;
@@ -1024,7 +1027,7 @@ button {
 
 .charts-subtitle {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(80, 71, 197, 0.8);
 }
 
 .charts-date-range {
@@ -1055,11 +1058,12 @@ button {
 /* 카드 */
 
 .charts-card {
-  margin-top: 12px;
-  background: rgba(255, 255, 255, 0.96);
-  border-radius: 20px;
-  padding: 16px 20px 20px;
-  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.35);
+  max-width: 1400px;   /* 🔥 여기만 바꿔주면 됨 */
+  margin: 0 auto;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 24px 32px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
 }
 
 .charts-error {
@@ -1110,6 +1114,110 @@ button {
     rgba(236, 72, 153, 0.02)
   );
 }
+
+/* ===== 연도 타임라인 ===== */
+.charts-year-timeline {
+  position: relative;
+  margin: 80px auto 10px;
+  max-width: 4000px;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 20px;
+}
+.charts-year-timeline-header {
+  margin-bottom: 1px;  /* 제목 아래 여백 */
+}
+
+.charts-year-line {
+  position: absolute;
+  left: 40px;
+  right: 40px;
+  top: 10px;
+  height: 2px;
+  background: linear-gradient(to right, #e2e2ff, #f0e4ff);
+  z-index: 0;
+}
+
+.year-timeline-item {
+  position: relative;
+  z-index: 1;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #9ca3af;
+  font-size: 12px;
+  margin-right: 10px;
+}
+
+.year-timeline-item:focus {
+  outline: none;
+}
+
+.year-timeline-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #a855f7;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+}
+
+.year-timeline-item--active .year-timeline-dot {
+  background: radial-gradient(circle at 30% 30%, #f97316, #a855f7);
+  border-color: transparent;
+}
+
+.year-timeline-label {
+  font-weight: 500;
+}
+
+.year-timeline-item--active .year-timeline-label {
+  color: #7c3aed;
+}
+
+/* ===== 페이지네이션 ===== */
+.charts-pagination {
+  margin-top: 18px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+}
+
+.charts-page-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #e0e7ff, #f5e1ff);
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(148, 163, 184, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.charts-page-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(148, 163, 184, 0.3);
+}
+
+.charts-page-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+
+.charts-page-info {
+  font-size: 13px;
+  color: #6b7280;
+}
+
 
 /* 컬럼 공통 */
 
@@ -1235,16 +1343,6 @@ button {
   text-transform: uppercase;
 }
 
-/* 차트 카드 */
-.charts-card {
-  max-width: 1100px;
-  margin: 0 auto;
-  background: #ffffff;
-  border-radius: 24px;
-  padding: 24px 32px;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
-}
-
 /* Top 10 강조 */
 .charts-row--top10 {
   background: linear-gradient(
@@ -1289,5 +1387,55 @@ button {
 .like-count {
   font-size: 0.9rem;
   font-weight: 600;
+}
+
+/* 연도별 → 주간차트로 돌아가는 보라색 화살표 버튼 */
+.charts-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+
+  padding: 6px 14px;
+  border-radius: 999px;
+
+  background: rgba(124, 77, 255, 0.1);
+  border: 1px solid #7c4dff;
+  color: #7c4dff;
+
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+/* 앞에 보라색 동그라미 화살표 아이콘 */
+.charts-back-btn::before {
+  content: "←";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+
+  background: #7c4dff;
+  color: #ffffff;
+  font-size: 0.7rem;
+}
+
+/* 호버 시 살짝 떠오르는 느낌 */
+.charts-back-btn:hover {
+  background: rgba(124, 77, 255, 0.18);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(124, 77, 255, 0.25);
+}
+
+/* 클릭 시 */
+.charts-back-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
