@@ -32,6 +32,29 @@ export default function PlaylistsPage() {
   const [publicResults, setPublicResults] = useState([]);
   const [publicLoading, setPublicLoading] = useState(false);
 
+  // 공개 플레이리스트 상세(곡 목록)용
+  const [publicSelectedId, setPublicSelectedId] = useState(null);
+  const [publicSelectedItems, setPublicSelectedItems] = useState([]);
+  const [publicItemsLoading, setPublicItemsLoading] = useState(false);
+  const [publicItemsError, setPublicItemsError] = useState("");
+
+  // 차트와 공유하는 "플레이리스트 선택 모달" 상태
+  const [playlistPickerOpen, setPlaylistPickerOpen] = useState(false);
+  const [playlistPickerLoading, setPlaylistPickerLoading] = useState(false);
+  const [playlistPickerError, setPlaylistPickerError] = useState("");
+  const [myPlaylists, setMyPlaylists] = useState([]);
+  const [targetSongId, setTargetSongId] = useState(null);
+
+  // 삭제용 3점 메뉴 상태
+  const [playlistMenuOpenId, setPlaylistMenuOpenId] = useState(null);
+  const [itemMenuOpenId, setItemMenuOpenId] = useState(null);
+
+  // 현재 선택된 플레이리스트 객체
+  const selectedPlaylist = useMemo(
+    () => playlists.find((p) => p.id === selectedId) || null,
+    [playlists, selectedId]
+  );
+
   // ─────────────────────────────
   // 내 플레이리스트 불러오기
   // ─────────────────────────────
@@ -132,6 +155,8 @@ export default function PlaylistsPage() {
     } catch (e) {
       console.error(e);
       alert("플레이리스트 삭제에 실패했습니다.");
+    } finally {
+      setPlaylistMenuOpenId(null);
     }
   }
 
@@ -143,11 +168,12 @@ export default function PlaylistsPage() {
     setItems([]);
     setSearchResults([]);
     setQuery("");
+    setItemMenuOpenId(null);
     await loadItems(id);
   }
 
   // ─────────────────────────────
-  // 곡 검색
+  // 곡 검색 (제목 + 가수명)
   // ─────────────────────────────
   async function handleSearchSongs() {
     const q = query.trim();
@@ -177,7 +203,9 @@ export default function PlaylistsPage() {
     }
   }
 
-  // 곡을 플레이리스트에 추가
+  // ─────────────────────────────
+  // 곡을 (현재 선택된) 플레이리스트에 추가
+  // ─────────────────────────────
   async function handleAddItemBySong(songId) {
     if (!selectedId) {
       alert("먼저 왼쪽에서 플레이리스트를 선택하세요.");
@@ -195,7 +223,9 @@ export default function PlaylistsPage() {
     }
   }
 
+  // ─────────────────────────────
   // 플레이리스트 내 곡 삭제
+  // ─────────────────────────────
   async function handleRemoveItem(itemId) {
     if (!selectedId) return;
     try {
@@ -207,6 +237,8 @@ export default function PlaylistsPage() {
     } catch (e) {
       console.error(e);
       alert("곡 삭제에 실패했습니다.");
+    } finally {
+      setItemMenuOpenId(null);
     }
   }
 
@@ -222,6 +254,9 @@ export default function PlaylistsPage() {
         `${API}/playlists/public?q=${encodeURIComponent(q)}`
       );
       setPublicResults(data);
+      setPublicSelectedId(null);
+      setPublicSelectedItems([]);
+      setPublicItemsError("");
     } catch (e) {
       console.error(e);
       alert("공개 플레이리스트 검색에 실패했습니다.");
@@ -238,6 +273,9 @@ export default function PlaylistsPage() {
         `${API}/playlists/public?sort=followers`
       );
       setPublicResults(data);
+      setPublicSelectedId(null);
+      setPublicSelectedItems([]);
+      setPublicItemsError("");
     } catch (e) {
       console.error(e);
       alert("인기 플레이리스트를 불러오는데 실패했습니다.");
@@ -246,14 +284,86 @@ export default function PlaylistsPage() {
     }
   }
 
+  // 공개 플레이리스트 한 줄 클릭 시 곡 목록 토글
+  async function handleTogglePublicPlaylist(playlistId) {
+    if (publicSelectedId === playlistId) {
+      setPublicSelectedId(null);
+      setPublicSelectedItems([]);
+      setPublicItemsError("");
+      return;
+    }
+
+    try {
+      setPublicSelectedId(playlistId);
+      setPublicItemsLoading(true);
+      setPublicItemsError("");
+
+      const data = await fetchJson(`${API}/playlists/${playlistId}/items`);
+      setPublicSelectedItems(data);
+    } catch (e) {
+      console.error(e);
+      setPublicSelectedItems([]);
+      setPublicItemsError(
+        e.message || "플레이리스트 곡 정보를 불러오는데 실패했습니다."
+      );
+    } finally {
+      setPublicItemsLoading(false);
+    }
+  }
+
   // 순위 바 길이 계산용 (가장 팔로워 많은 값)
   const maxFollowers = useMemo(() => {
     if (!publicResults || publicResults.length === 0) return 1;
-    return publicResults.reduce(
-      (max, pl) => Math.max(max, Number(pl.followerCount ?? 0)),
-      0
-    ) || 1;
+    return (
+      publicResults.reduce(
+        (max, pl) => Math.max(max, Number(pl.followerCount ?? 0)),
+        0
+      ) || 1
+    );
   }, [publicResults]);
+
+  // ─────────────────────────────
+  // 공개 플리 곡에서 "플리 추가" 모달 열기
+  // ─────────────────────────────
+  async function handleOpenPlaylistPicker(songId) {
+    try {
+      setTargetSongId(songId);
+      setPlaylistPickerOpen(true);
+      setPlaylistPickerError("");
+      setPlaylistPickerLoading(true);
+
+      const data = await fetchJson(`${API}/playlists`);
+      setMyPlaylists(data);
+    } catch (e) {
+      console.error(e);
+      setPlaylistPickerError(
+        e.message || "플레이리스트 목록을 불러오는데 실패했습니다."
+      );
+    } finally {
+      setPlaylistPickerLoading(false);
+    }
+  }
+
+  // ─────────────────────────────
+  // 모달에서 특정 플레이리스트 선택 → 곡 추가
+  // ─────────────────────────────
+  async function handleSelectPlaylistForSong(playlistId) {
+    if (!targetSongId) return;
+
+    try {
+      await fetchJson(`${API}/playlists/${playlistId}/items`, {
+        method: "POST",
+        body: JSON.stringify({ songId: targetSongId }),
+      });
+
+      alert("플레이리스트에 곡이 추가되었습니다. 🎵");
+      setPlaylistPickerOpen(false);
+      setTargetSongId(null);
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "플레이리스트에 곡을 추가하는 데 실패했습니다.");
+    }
+  }
 
   return (
     <>
@@ -404,65 +514,103 @@ export default function PlaylistsPage() {
           <div>
             <h3 style={{ marginBottom: 8 }}>플레이리스트 목록</h3>
             <ul className="list">
-              {playlists.map((p) => (
-                <li
-                  key={p.id}
-                  className="list-item"
-                  style={{
-                    cursor: "pointer",
-                    border:
-                      p.id === selectedId
-                        ? "2px solid #6366f1"
-                        : "1px solid #e5e7eb",
-                    borderRadius: 8,
-                    alignItems: "flex-start",
-                    gap: 8,
-                  }}
-                  onClick={() => handleSelectPlaylist(p.id)}
-                >
-                  <div style={{ flex: 1 }}>
-                    <div>
-                      <span className="text-muted">#{p.id} </span>
-                      <strong>{p.name}</strong>
-                      {!p.isPublic && (
+              {playlists.map((p) => {
+                const isPublic = p.isPublic ?? p.is_public ?? true;
+                return (
+                  <li
+                    key={p.id}
+                    className="list-item"
+                    style={{
+                      cursor: "pointer",
+                      border:
+                        p.id === selectedId
+                          ? "2px solid #6366f1"
+                          : "1px solid #e5e7eb",
+                      borderRadius: 8,
+                      alignItems: "flex-start",
+                      gap: 8,
+                    }}
+                    onClick={() => handleSelectPlaylist(p.id)}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div>
+                        <span className="text-muted">#{p.id} </span>
+                        <strong>{p.name}</strong>
                         <span
+                          className={
+                            "playlist-modal-badge " +
+                            (isPublic
+                              ? "playlist-modal-badge--public"
+                              : "playlist-modal-badge--private")
+                          }
+                          style={{ marginLeft: 6 }}
+                        >
+                          {isPublic ? "공개" : "비공개"}
+                        </span>
+                      </div>
+                      {p.note && (
+                        <div
                           style={{
-                            marginLeft: 6,
-                            fontSize: 11,
-                            padding: "2px 6px",
-                            borderRadius: 999,
-                            background: "#e5e7eb",
-                            color: "#4b5563",
+                            marginTop: 4,
+                            fontSize: 12,
+                            color: "#6b7280",
+                            whiteSpace: "pre-line",
                           }}
                         >
-                          비공개
-                        </span>
+                          {p.note}
+                        </div>
                       )}
                     </div>
-                    {p.note && (
-                      <div
-                        style={{
-                          marginTop: 4,
-                          fontSize: 12,
-                          color: "#6b7280",
-                          whiteSpace: "pre-line",
+
+                    {/* 3점 메뉴 버튼 */}
+                    <div style={{ position: "relative" }}>
+                      <button
+                        className="btn btn-secondary playlist-menu-button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPlaylistMenuOpenId((prev) =>
+                            prev === p.id ? null : p.id
+                          );
                         }}
                       >
-                        {p.note}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    className="btn btn-danger"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeletePlaylist(p.id);
-                    }}
-                  >
-                    삭제
-                  </button>
-                </li>
-              ))}
+                        ⋮
+                      </button>
+                      {playlistMenuOpenId === p.id && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: "-100px",     // ← 왼쪽으로 이동
+                            top: "-20%",
+                            background: "#fff",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: 8,
+                            boxShadow:
+                              "0 8px 16px rgba(15, 23, 42, 0.12)",
+                            
+                            zIndex: 10,
+
+                            display: "flex",          // ← 가로 배치
+                            flexDirection: "row",     // ← 가로 방향
+                            gap: "6px",               // ← 버튼 간격
+                          }}
+                        >
+                          <button
+                            className="btn btn-danger"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePlaylist(p.id);
+                            }}
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      )}
+
+                      
+                    </div>
+                  </li>
+                );
+              })}
               {!loading && playlists.length === 0 && !createMode && (
                 <li
                   className="list-item"
@@ -472,7 +620,10 @@ export default function PlaylistsPage() {
                     border: "none",
                   }}
                 >
-                  <span className="text-muted" style={{ marginBottom: 8 }}>
+                  <span
+                    className="text-muted"
+                    style={{ marginBottom: 8 }}
+                  >
                     플레이리스트가 없습니다.
                   </span>
                   <button
@@ -488,9 +639,11 @@ export default function PlaylistsPage() {
 
           {/* 오른쪽: 선택된 플리 상세 + 곡 검색/추가 */}
           <div>
-            <h3 style={{ marginBottom: 8 }}>
-              선택된 플레이리스트{" "}
-              {selectedId ? `#${selectedId}` : "(선택 안 됨)"}
+            <h3 style={{ marginBottom: 3 }}>
+              
+              {selectedPlaylist
+                ? selectedPlaylist.name
+                : "(선택 안 됨)"}
             </h3>
 
             {!selectedId && (
@@ -510,13 +663,15 @@ export default function PlaylistsPage() {
                     background: "#f9fafb",
                   }}
                 >
-                  <div style={{ marginBottom: 8, fontWeight: 500 }}>
-                    곡 검색해서 플레이리스트에 추가
+                  <div
+                    style={{ marginBottom: 8, fontWeight: 500 }}
+                  >
+                    검색해서 플레이리스트에 추가
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <input
                       className="field-input"
-                      placeholder="곡 제목 일부를 입력하세요"
+                      placeholder="제목 또는 가수를 입력하세요"
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       onKeyDown={handleSearchKeyDown}
@@ -542,24 +697,30 @@ export default function PlaylistsPage() {
                           <li
                             key={song.id}
                             className="list-item"
-                            style={{ cursor: "pointer" }}
-                            onClick={() => handleAddItemBySong(song.id)}
+                            style={{
+                              justifyContent: "space-between",
+                            }}
                           >
-                            <span>
-                              <span className="text-muted">
-                                #{song.id}{" "}
-                              </span>
+                            <span style={{ textAlign: "left" }}>
                               <strong>{song.title}</strong>
-                              {song.artistId && (
+                              {song.artistName && (
                                 <span className="text-muted">
                                   {" "}
-                                  (artistId: {song.artistId})
+                                  · {song.artistName}
                                 </span>
                               )}
                             </span>
-                            <span className="text-muted">
-                              클릭하면 추가됩니다
-                            </span>
+
+                            <button
+                              type="button"
+                              className="playlist-button"
+                              onClick={() =>
+                                handleAddItemBySong(song.id)
+                              }
+                              title="선택된 플레이리스트에 추가"
+                            >
+                              +
+                            </button>
                           </li>
                         ))}
                       </ul>
@@ -580,28 +741,73 @@ export default function PlaylistsPage() {
 
                 {/* 플레이리스트에 담긴 곡 목록 */}
                 <div>
-                  <h4 style={{ marginBottom: 8 }}>플레이리스트에 담긴 곡</h4>
+                  <h4 style={{ marginBottom: 8 }}>
+                    플레이리스트 곡
+                  </h4>
                   {loadingItems && (
-                    <p className="text-muted">곡 목록 불러오는 중...</p>
+                    <p className="text-muted">
+                      곡 목록 불러오는 중...
+                    </p>
                   )}
                   <ul className="list">
                     {items.map((item) => (
-                      <li key={item.id} className="list-item">
+                      <li
+                        key={item.id}
+                        className="list-item"
+                        style={{
+                          justifyContent: "space-between",
+                        }}
+                      >
                         <span>
                           <strong>{item.position}.</strong>{" "}
-                          <span className="text-muted">
-                            songId: {item.songId}
-                          </span>{" "}
                           {item.songTitle && (
-                            <span> - {item.songTitle}</span>
+                            <span>{item.songTitle}</span>
+                          )}
+                          {item.artistName && (
+                            <span className="text-muted">
+                              {" "}
+                              – {item.artistName}
+                            </span>
                           )}
                         </span>
-                        <button
-                          className="btn btn-danger"
-                          onClick={() => handleRemoveItem(item.id)}
-                        >
-                          제거
-                        </button>
+
+                        {/* 3점 메뉴 버튼 (곡 삭제) */}
+                        <div style={{ position: "relative" }}>
+                          <button
+                            className="btn btn-secondary playlist-menu-button"
+                            onClick={() =>
+                              setItemMenuOpenId((prev) =>
+                                prev === item.id ? null : item.id
+                              )
+                            }
+                          >
+                            ⋮
+                          </button>
+                          {itemMenuOpenId === item.id && (
+                            <div
+                                style={{
+                                    position: "absolute",
+                                    left: "-100px",
+                                    top: "-20%",
+                                    background: "#fff",
+                                    border: "1px solid #e5e7eb",
+                                    borderRadius: 8,
+                                    zIndex: 10,
+                                    display: "flex",
+                                    flexDirection: "row",
+                                    gap: "6px",
+                                }}
+                            >
+                                <button
+                                    className="btn btn-danger"
+                                    onClick={() => handleRemoveItem(item.id)}
+                                >
+                                    삭제
+                                </button>
+                            </div>
+
+                          )}
+                        </div>
                       </li>
                     ))}
                     {!loadingItems && items.length === 0 && (
@@ -623,7 +829,7 @@ export default function PlaylistsPage() {
       <section className="card" style={{ marginTop: 32 }}>
         <div className="card-header">
           <div className="card-title">
-            <span>공개 플레이리스트 둘러보기</span>
+            <span>공개 플레이리스트 </span>
           </div>
         </div>
 
@@ -634,7 +840,10 @@ export default function PlaylistsPage() {
             value={publicQuery}
             onChange={(e) => setPublicQuery(e.target.value)}
           />
-          <button className="btn btn-secondary" onClick={handleSearchPublic}>
+          <button
+            className="btn btn-secondary"
+            onClick={handleSearchPublic}
+          >
             {publicLoading && publicMode === "search"
               ? "검색 중..."
               : "검색"}
@@ -642,17 +851,26 @@ export default function PlaylistsPage() {
 
           <button
             className="btn btn-secondary"
-            style={{ marginLeft: "auto" }}
+            style={{ 
+              marginLeft: "auto",
+              background: "linear-gradient(135deg, #8b5cf6, #7c3aed)", // 🔥 배경
+              color: "#ffffff",                                      // 🔥 글자색
+              fontWeight: "600",                                     // 🔥 폰트 굵기
+              fontSize: "14px",                                      // 🔥 폰트 크기
+              border: "none",    
+             }}
             onClick={handleLoadPopularPublic}
           >
             {publicLoading && publicMode === "popular"
               ? "불러오는 중..."
-              : "팔로우 순 인기 보기"}
+              : "인기 플레이리스트"}
           </button>
         </div>
 
         {publicLoading && (
-          <p className="text-muted">공개 플레이리스트 불러오는 중...</p>
+          <p className="text-muted">
+            공개 플레이리스트 불러오는 중...
+          </p>
         )}
 
         {!publicLoading && publicResults.length === 0 && (
@@ -671,11 +889,13 @@ export default function PlaylistsPage() {
               <span className="col-actions" />
             </div>
 
-            {/* 랭킹 행들 */}
+            {/* 랭킹 리스트 */}
             <div className="public-playlist-body">
               {publicResults.map((pl, index) => {
                 const rank = index + 1;
-                const followerCount = Number(pl.followerCount ?? 0);
+                const followerCount = Number(
+                  pl.followerCount ?? 0
+                );
                 const ratio = followerCount / maxFollowers;
 
                 const rankClass =
@@ -687,49 +907,153 @@ export default function PlaylistsPage() {
                     ? " public-playlist-row--rank3"
                     : "";
 
+                const isOpened = publicSelectedId === pl.id;
+
                 return (
-                  <div
-                    key={pl.id}
-                    className={"public-playlist-row" + rankClass}
-                  >
-                    <div className="col-rank">{rank}</div>
+                  <div key={pl.id}>
+                    {/* ▶ 한 줄 전체 클릭 가능 */}
+                    <div
+                      className={
+                        "public-playlist-row" + rankClass
+                      }
+                      onClick={() =>
+                        handleTogglePublicPlaylist(pl.id)
+                      }
+                      style={{ cursor: "pointer" }}
+                    >
+                      <div className="col-rank">{rank}</div>
 
-                    <div className="col-main">
-                      <div className="public-playlist-title">
-                        {pl.name}
-                      </div>
-                      <div className="public-playlist-meta">
-                        만든이: {pl.ownerNickname || "알 수 없음"}
-                        {" · "}곡 {pl.trackCount ?? 0}개
+                      <div className="col-main">
+                        <div className="public-playlist-title">
+                          {pl.name}
+                        </div>
+                        <div className="public-playlist-meta">
+                          만든이:{" "}
+                          {pl.ownerNickname || "알 수 없음"}
+                          {" · "}곡 {pl.trackCount ?? 0}개
+                        </div>
+
+                        {/* 팔로워 비율 바 */}
+                        <div className="public-playlist-bar-wrapper">
+                          <div
+                            className="public-playlist-bar"
+                            style={{
+                              width: `${Math.max(
+                                8,
+                                ratio * 100
+                              )}%`,
+                            }}
+                          />
+                        </div>
                       </div>
 
-                      {/* 팔로워 수 비율 바 */}
-                      <div className="public-playlist-bar-wrapper">
-                        <div
-                          className="public-playlist-bar"
-                          style={{
-                            width: `${
-                              Math.max(8, ratio * 100)
-                            }%`,
+                      <div className="col-followers">
+                        {followerCount}명
+                      </div>
+
+                      <div className="col-actions">
+                        <button
+                          className="btn btn-secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            alert(
+                              "팔로우 기능은 아직 미구현입니다 :)"
+                            );
                           }}
-                        />
+                        >
+                          팔로우
+                        </button>
                       </div>
                     </div>
 
-                    <div className="col-followers">
-                      {followerCount}명
-                    </div>
+                    {/* ▼ 클릭 시 아래로 곡 목록 펼침 */}
+                    {isOpened && (
+                      <div className="public-playlist-detail">
+                        {publicItemsLoading && (
+                          <p className="text-muted">
+                            곡 목록 불러오는 중...
+                          </p>
+                        )}
 
-                    <div className="col-actions">
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() =>
-                          alert("팔로우 기능은 아직 미구현입니다 :)")
-                        }
-                      >
-                        팔로우
-                      </button>
-                    </div>
+                        {publicItemsError && (
+                          <p className="text-error">
+                            ⚠ {publicItemsError}
+                          </p>
+                        )}
+
+                        {!publicItemsLoading &&
+                          !publicItemsError && (
+                            <>
+                              {publicSelectedItems.length ===
+                              0 ? (
+                                <p className="text-muted">
+                                  이 플레이리스트에 곡 정보가
+                                  없습니다.
+                                </p>
+                              ) : (
+                                <div className="public-playlist-songs">
+                                  {/* 헤더 */}
+                                  <div className="public-playlist-songs-header">
+                                    <span className="col-rank">
+                                      순번
+                                    </span>
+                                    <span className="col-title">
+                                      곡명
+                                    </span>
+                                    <span className="col-artist">
+                                      가수
+                                    </span>
+                                  </div>
+
+                                  {/* 곡 리스트 */}
+                                  <div className="public-playlist-songs-body">
+                                    {publicSelectedItems.map(
+                                      (item, index2) => (
+                                        <div
+                                          key={item.id}
+                                          className="public-playlist-songs-row"
+                                        >
+                                          <div className="col-rank">
+                                            {index2 + 1}
+                                          </div>
+
+                                          <div className="col-title">
+                                            <div className="song-with-add">
+                                              <span className="song-title">
+                                                {item.songTitle ||
+                                                  item.title}
+                                              </span>
+                                              <button
+                                                type="button"
+                                                className="playlist-button"
+                                                onClick={() =>
+                                                  handleOpenPlaylistPicker(
+                                                    item.songId ||
+                                                      item.song_id
+                                                  )
+                                                }
+                                                title="내 플레이리스트에 추가"
+                                              >
+                                                +
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          <div className="col-artist">
+                                            {item.artistName ||
+                                              item.artist_name ||
+                                              "-"}
+                                          </div>
+                                        </div>
+                                      )
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -737,6 +1061,85 @@ export default function PlaylistsPage() {
           </div>
         )}
       </section>
+
+      {/* ====== 플레이리스트 선택 모달 (공개 플리 곡 → 내 플리에 담기) ====== */}
+      {playlistPickerOpen && (
+        <div className="playlist-modal-backdrop">
+          <div className="playlist-modal">
+            <h3 className="playlist-modal-title">
+              플레이리스트에 추가
+            </h3>
+
+            {playlistPickerLoading && (
+              <p className="text-muted">
+                플레이리스트 불러오는 중...
+              </p>
+            )}
+
+            {playlistPickerError && (
+              <p className="text-error">
+                ⚠ {playlistPickerError}
+              </p>
+            )}
+
+            {!playlistPickerLoading &&
+              myPlaylists.length === 0 && (
+                <p className="text-muted">
+                  아직 생성된 플레이리스트가 없습니다. <br />
+                  먼저 플레이리스트를 만들어 주세요.
+                </p>
+              )}
+
+            {!playlistPickerLoading &&
+              myPlaylists.length > 0 && (
+                <ul className="playlist-modal-list">
+                  {myPlaylists.map((pl) => {
+                    const isPublic =
+                      pl.isPublic ?? pl.is_public ?? true;
+                    return (
+                      <li
+                        key={pl.id}
+                        className="playlist-modal-item"
+                      >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleSelectPlaylistForSong(pl.id)
+                          }
+                        >
+                          <span className="playlist-modal-name">
+                            #{pl.id} {pl.name}
+                          </span>
+                          <span
+                            className={
+                              "playlist-modal-badge " +
+                              (isPublic
+                                ? "playlist-modal-badge--public"
+                                : "playlist-modal-badge--private")
+                            }
+                          >
+                            {isPublic ? "공개" : "비공개"}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+            <button
+              type="button"
+              className="playlist-modal-close"
+              onClick={() => {
+                setPlaylistPickerOpen(false);
+                setTargetSongId(null);
+              }}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

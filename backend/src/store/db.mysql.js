@@ -407,7 +407,6 @@ export async function deleteSong(id) {
 // Playlists
 // --------------------------------------------------------------------
 
-// 이미 있는 상수들 그대로 두고, Playlists 쪽 함수들만 이렇게 맞춰줘
 
 // GET /playlists  → 내 플레이리스트
 export async function getPlaylists(userId) {
@@ -462,6 +461,33 @@ export async function updatePlaylist(id, { name, note, isPublic }) {
 
   return { id, name, note, isPublic };
 }
+
+// db.mysql.js 안에 추가 (또는 기존 searchSongsByTitle 대체)
+export async function searchSongs({ q }) {
+  const like = `%${q}%`;
+
+  const [rows] = await pool.query(
+    `
+    SELECT
+      s.song_id AS id,
+      s.title,
+      GROUP_CONCAT(DISTINCT a.name ORDER BY sa.display_order SEPARATOR ', ') AS artistName
+    FROM songs AS s
+    LEFT JOIN song_artists AS sa
+      ON sa.song_id = s.song_id
+    LEFT JOIN artists AS a
+      ON a.artist_id = sa.artist_id
+    WHERE s.title LIKE ? OR a.name LIKE ?
+    GROUP BY s.song_id, s.title
+    ORDER BY s.song_id ASC
+    LIMIT 100
+    `,
+    [like, like]
+  );
+
+  return rows;
+}
+
 
 export async function searchPublicPlaylists({ q }) {
   const params = [];
@@ -590,25 +616,44 @@ export async function deletePlaylist(id) {
 // --------------------------------------------------------------------
 
 // GET /playlists/:id/items
+
 export async function getPlaylistItems(playlistId) {
   const [rows] = await pool.query(
     `
-    SELECT
-      i.${ITEM_ID_COL}          AS id,
-      i.${ITEM_PLAYLIST_ID_COL} AS playlistId,
-      i.${ITEM_SONG_ID_COL}     AS songId,
-      i.${ITEM_POSITION_COL}    AS position,
-      s.${SONG_TITLE_COL}       AS songTitle
-    FROM ${PLAYLIST_ITEMS_TABLE} i
-    JOIN ${SONGS_TABLE} s
-      ON i.${ITEM_SONG_ID_COL} = s.${SONG_ID_COL}
-    WHERE i.${ITEM_PLAYLIST_ID_COL} = ?
-    ORDER BY i.${ITEM_POSITION_COL} ASC, i.${ITEM_ID_COL} ASC
+      SELECT
+        pi.item_id                                                     AS id,
+        pi.playlist_id,
+        pi.song_id                                                     AS songId,
+        pi.position,
+        pi.added_at,
+        s.title                                                        AS songTitle,
+        -- 🔽 가수 이름 (여러 명이면 ', '로 합치기)
+        GROUP_CONCAT(DISTINCT a.name ORDER BY sa.display_order SEPARATOR ', ')
+          AS artistName
+      FROM playlist_items AS pi
+      JOIN songs AS s
+        ON s.song_id = pi.song_id
+      LEFT JOIN song_artists AS sa
+        ON sa.song_id = s.song_id
+      LEFT JOIN artists AS a
+        ON a.artist_id = sa.artist_id
+      WHERE pi.playlist_id = ?
+      GROUP BY
+        pi.item_id,
+        pi.playlist_id,
+        pi.song_id,
+        pi.position,
+        pi.added_at,
+        s.title
+      ORDER BY pi.position ASC
     `,
     [playlistId]
   );
+
   return rows;
 }
+
+
 
 // POST /playlists/:id/items
 export async function addPlaylistItem({ playlistId, songId }) {

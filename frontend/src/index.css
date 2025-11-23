@@ -1572,6 +1572,8 @@ button {
   margin-left: auto;
 }
 
+
+
 /* 생성 폼 */
 
 .my-playlist-create {
@@ -1765,49 +1767,111 @@ button {
 .public-playlist-row--rank3 {
   background: linear-gradient(
     90deg,
-    rgba(244, 114, 182, 0.25),
+    rgba(187, 155, 49, 0.25),
     rgba(255, 255, 255, 0.9)
   );
 }
+/* ============================
+   공개 플리 “곡 리스트”용 스타일
+   ============================ */
 
-.public-playlist-title {
-  font-weight: 600;
-  color: #111827;
+/* 랭킹 한 줄 아래에 붙는 상세 영역 */
+.public-playlist-detail {
+  padding: 0 14px 12px 74px;
+  background: #f9fafb;
+  overflow: visible; /* 버튼 그림자 잘리지 않게 */
 }
 
-.public-playlist-meta {
+/* 곡 리스트 전체 래퍼 */
+.public-playlist-songs {
+  margin-top: 4px;
+  overflow: visible; /* 버튼 그림자 보이게 */
+}
+
+/* 헤더 + 각 곡 한 줄: 순번 / 곡명 / 가수 */
+.public-playlist-songs-header,
+.public-playlist-songs-row {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  column-gap: 16px; /* 🔧 오타 수정 */
+  padding: 10px 0; /* 🔧 버튼이 들어갈 충분한 높이 확보 */
+  overflow: visible; /* 버튼 그림자가 자연스럽게 내려오도록 */
+}
+
+/* 헤더 스타일 */
+.public-playlist-songs-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  border-top: 1px solid #e5e7eb;
+  border-bottom: 1px solid #f3f4f6;
+  background: #f3f4f6;
+}
+
+/* 곡 한 줄 */
+.public-playlist-songs-row {
+  font-size: 13px;
+  color: #111827;
+  min-height: 52px; /* 🔧 + 버튼이 자연스럽게 들어가는 기준 높이 */
+}
+
+/* 줄 배경 번갈이 */
+.public-playlist-songs-row:nth-child(odd) {
+  background: #f9fafb;
+}
+
+.public-playlist-songs-row:nth-child(even) {
+  background: #ffffff;
+}
+
+/* 내부 컬럼 정렬 */
+.public-playlist-songs-row .col-rank {
+  text-align: center;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.public-playlist-songs-row .col-title {
+  overflow: visible; /* 버튼과 함께 자연스럽게 배치 */
+}
+
+.public-playlist-songs-row .col-artist {
   font-size: 12px;
   color: #6b7280;
-  margin-top: 2px;
-}
-
-.public-playlist-bar-wrapper {
-  margin-top: 6px;
-  height: 4px;
-  border-radius: 999px;
-  background: #e5e7eb;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.public-playlist-bar {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #f59e0b, #f97316);
-}
-
-.col-rank {
-  font-weight: 600;
-  text-align: center;
-}
-
-.col-followers {
-  font-size: 13px;
-  color: #4b5563;
-  text-align: center;
-}
-
-.col-actions {
+/* 곡명 + + 버튼 같이 붙어 있는 부분 */
+.song-with-add {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  overflow: visible; /* 그림자 표시 */
+}
+
+.song-with-add .song-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+/* 점(⋮) 메뉴용 작은 버튼 */
+.playlist-menu-button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+
+  margin-left: -40px;     
 }
 

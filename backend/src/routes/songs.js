@@ -1,25 +1,32 @@
 // backend/src/routes/songs.js
 import { Router } from "express";
+import { authMiddleware } from "./auth.js";
 import {
   getSongs,
   createSong,
   updateSong,
   deleteSong,
+  searchSongs,
 } from "../store/db.mysql.js";
 
 const router = Router();
 
-// GET /songs  (?artistId=...&q=...)
-router.get("/", async (req, res, next) => {
+// GET /songs  (?q=...)
+router.get("/", authMiddleware, async (req, res, next) => {
   try {
-    const { artistId, q } = req.query;
-    const songs = await getSongs({ artistId, q });
-    res.json(songs);
+    const q = (req.query.q || "").toString().trim();
+
+    if (!q) {
+      // 검색어 없으면 그냥 빈 배열 리턴
+      return res.json([]);
+    }
+
+    const rows = await searchSongs({ q });
+    res.json(rows);
   } catch (err) {
     next(err);
   }
 });
-
 // POST /songs
 router.post("/", async (req, res, next) => {
   try {
