@@ -11,22 +11,36 @@ import {
 
 const router = Router();
 
-// GET /songs  (?q=...)
+/**
+ * GET /songs
+ */
 router.get("/", authMiddleware, async (req, res, next) => {
   try {
-    const q = (req.query.q || "").toString().trim();
+    const qRaw = (req.query.q || "").toString().trim();
+    const artistId = req.query.artistId
+      ? Number(req.query.artistId)
+      : null;
+    const sort = (req.query.sort || "").toString();
 
-    if (!q) {
-      // 검색어 없으면 그냥 빈 배열 리턴
-      return res.json([]);
+    //플레이리스트 / 빠른 검색용: q가 있으면 searchSongs 사용
+    if (qRaw) {
+      const rows = await searchSongs({ q: qRaw });
+      return res.json(rows);
     }
 
-    const rows = await searchSongs({ q });
+    // 🎵 q가 없으면 Songs 페이지용: 전체 + 필터/정렬
+    const rows = await getSongs({
+      artistId,
+      q: "",
+      sort,
+    });
+
     res.json(rows);
   } catch (err) {
     next(err);
   }
 });
+
 // POST /songs
 router.post("/", async (req, res, next) => {
   try {
