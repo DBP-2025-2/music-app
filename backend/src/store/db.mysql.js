@@ -836,19 +836,63 @@ export async function getRecommendations(myEmail) {
 // Play History (READ-ONLY)
 // --------------------------------------------------------------------
 
-// GET /play-history
-export async function getPlayHistory() {
-  const [rows] = await pool.query(
-    `
-    SELECT
-      ${HISTORY_ID_COL} AS id,
-      user_id           AS userId,
-      song_id           AS songId,
-      played_at         AS playedAt
-    FROM ${PLAY_HISTORY_TABLE}
-    ORDER BY played_at DESC
-    `
-  );
+// 1. 검색용 모든 노래 가져오기 (가수 이름 포함)
+export async function getAllSongsForHistory() {
+  const [rows] = await pool.query(`
+    SELECT 
+      s.song_id AS song_id, 
+      s.title, 
+      a.name AS artist 
+    FROM songs s
+    JOIN song_artists sa ON s.song_id = sa.song_id AND (sa.display_order = 1 OR sa.display_order IS NULL)
+    JOIN artists a ON sa.artist_id = a.artist_id
+    ORDER BY s.title ASC
+  `);
+  return rows;
+}
+
+// 2. 재생 기록 저장 + 조회수 증가 (트랜잭션)
+export async function addPlayHistory(userId, songId) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // 기록 저장
+    await conn.query(
+      "INSERT INTO play_history (user_id, song_id) VALUES (?, ?)",
+      [userId, songId]
+    );
+
+    // 조회수 증가
+    await conn.query(
+      "UPDATE songs SET play_count = play_count + 1 WHERE song_id = ?",
+      [songId]
+    );
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+// 3. 내 재생 기록 조회 (최신순 20개)
+export async function getMyPlayHistory(userId) {
+  const [rows] = await pool.query(`
+    SELECT 
+      h.played_at, 
+      s.title, 
+      a.name AS artist_name
+    FROM play_history h
+    JOIN songs s ON h.song_id = s.song_id
+    JOIN song_artists sa ON s.song_id = sa.song_id AND (sa.display_order = 1 OR sa.display_order IS NULL)
+    JOIN artists a ON sa.artist_id = a.artist_id
+    WHERE h.user_id = ?
+    ORDER BY h.played_at DESC
+    LIMIT 20
+  `, [userId]);
   return rows;
 }
 
