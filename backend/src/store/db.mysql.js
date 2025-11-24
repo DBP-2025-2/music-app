@@ -266,7 +266,6 @@ export async function getSongs({ artistId, q } = {}) {
      AND (sa.${SA_DISPLAY_ORDER_COL} = 1 OR sa.${SA_DISPLAY_ORDER_COL} IS NULL)
     ${whereClause}
     ORDER BY s.${SONG_ID_COL} DESC
-    LIMIT 50
     `,
     params
   );
@@ -462,7 +461,7 @@ export async function updatePlaylist(id, { name, note, isPublic }) {
   return { id, name, note, isPublic };
 }
 
-// db.mysql.js 안에 추가 (또는 기존 searchSongsByTitle 대체)
+// 제목/가수 이름으로 검색 (플레이리스트 검색에서 사용)
 export async function searchSongs({ q }) {
   const like = `%${q}%`;
 
@@ -471,7 +470,11 @@ export async function searchSongs({ q }) {
     SELECT
       s.song_id AS id,
       s.title,
-      GROUP_CONCAT(DISTINCT a.name ORDER BY sa.display_order SEPARATOR ', ') AS artistName
+      GROUP_CONCAT(
+        DISTINCT a.name
+        ORDER BY sa.display_order
+        SEPARATOR ', '
+      ) AS artistName
     FROM songs AS s
     LEFT JOIN song_artists AS sa
       ON sa.song_id = s.song_id
@@ -480,7 +483,6 @@ export async function searchSongs({ q }) {
     WHERE s.title LIKE ? OR a.name LIKE ?
     GROUP BY s.song_id, s.title
     ORDER BY s.song_id ASC
-    LIMIT 100
     `,
     [like, like]
   );
