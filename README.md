@@ -25,7 +25,7 @@ music-app/
     └── .env
 ```
 
-## 🚀 시작하기
+## 시작하기
 
 ### 사전 요구사항
 
@@ -86,27 +86,27 @@ npm run dev
 
 앱: http://localhost:5173
 
-## 📚 주요 기능
+## 주요 기능
 
 ### 인증 (Authentication)
 
-- ✅ 회원가입 (`/register`)
-- ✅ 로그인 (`/login`)
-- ✅ JWT 토큰 기반 인증
-- ✅ 비밀번호 암호화 (bcrypt)
+- 회원가입 (`/register`)
+- 로그인 (`/login`)
+- JWT 토큰 기반 인증
+- 비밀번호 암호화 (bcrypt)
 
 ### 음악 관리
 
-- ✅ 아티스트 관리 (CRUD)
-- ✅ 곡 관리 (CRUD)
-- ✅ 앨범 관리 (CRUD)
-- ✅ 플레이리스트 관리 (CRUD)
-- ✅ 곡 검색 및 필터링
-- ✅ 재생 기록
-- ✅ 차트 조회
-- ✅ 팔로우 시스템
+- 아티스트 관리 (CRUD)
+- 곡 관리 (CRUD)
+- 앨범 관리 (CRUD)
+- 플레이리스트 관리 (CRUD)
+- 곡 검색 및 필터링
+- 재생 기록
+- 차트 조회
+- 팔로우 시스템
 
-## 🔌 API 엔드포인트
+## API 엔드포인트
 
 ### 인증
 
@@ -145,81 +145,16 @@ npm run dev
 - `POST /playlists/:id/items` - 곡 추가
 - `DELETE /playlists/:id/items/:itemId` - 곡 제거
 
-## 🛠️ 기술 스택
-
-### 백엔드
-
-- **Runtime**: Node.js
-- **Framework**: Express.js
-- **Database**: MySQL 2
-- **Authentication**: JWT (jsonwebtoken)
-- **Password Hashing**: bcrypt
-- **Template Engine**: EJS
-- **Dev Tool**: nodemon
-
-### 프론트엔드
-
-- **Framework**: React 18
-- **Build Tool**: Vite
-- **Router**: React Router
-- **HTTP Client**: Fetch API
-- **CSS**: Vanilla CSS
-
-## 📝 개발 참고사항
-
-### 토큰 저장
-
-로그인 후 JWT 토큰은 `localStorage`에 저장됩니다.
-
-```javascript
-localStorage.getItem("authToken");
-```
-
-### API 요청 헤더
-
-JWT 토큰이 필요한 API는 다음과 같이 전송합니다:
-
-```javascript
-Authorization: Bearer YOUR_JWT_TOKEN
-```
-
-### Content-Type
-
-모든 API 요청은 `application/json`으로 설정됩니다.
-
-## 🐛 문제 해결
-
-### 포트 충돌
-
-- 백엔드: PORT 환경변수로 변경
-- 프론트엔드: `npm run dev -- --port 5174`
-
-### DB 연결 실패
-
-- `.env` 파일의 DB 정보 확인
-- MySQL 서버 실행 확인
-
-### CORS 에러
-
-- 백엔드에서 CORS 미들웨어가 설정되어 있습니다.
-- 프론트엔드의 API 주소 확인
-
-## 📄 라이선스
-
-ISC
-
----
-
 ## ✨ 최신 업데이트
 
 ### v2.0
 
-- ✅ 프론트엔드 로그인/회원가입 페이지 추가
-- ✅ JWT 토큰 기반 인증 시스템
-- ✅ 백엔드와 프론트엔드 통합
-- ✅ music-user 모듈 완전 통합
-- ✅ 필드명 불일치 문제 모두 해결
-- ✅ 외래키 제약 조건 최적화
+- 프론트엔드 로그인/회원가입 페이지 추가
+- JWT 토큰 기반 인증 시스템
+- 백엔드와 프론트엔드 통합
+- music-user 모듈 완전 통합
+- 필드명 불일치 문제 모두 해결
+- 외래키 제약 조건 최적화
 
 # .env.example 파일을 복사해서 .env 파일을 만드세요.
 
