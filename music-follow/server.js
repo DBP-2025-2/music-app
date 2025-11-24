@@ -32,17 +32,13 @@ app.use(express.static(path.join(__dirname, "../../frontend/public")));
 // ❗ JSON body 파싱 (이게 없으면 req.body 가 undefined)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// 임시 유저 설정 미들웨어 (나중에 인증 미들웨어로 교체 필요)
-// app.use((req, res, next) => {
-//   req.user = {
-//     email: 'user2@test.com', // DB에 있는 실제 이메일
-//     nickname: 'kpop_master',
-//     userId: 2 // DB에 있는 실제 ID
-//   };
-//   next();
-// });
-
+app.use((req, res, next) => {
+  req.user = {
+    email: 'user2@test.com', // DB에 실제로 존재하는 유저 이메일 (kpop_master)
+    nickname: 'kpop_master'
+  };
+  next();
+});
 // 헬스체크
 app.get("/health", (req, res) => {
   res.json({ ok: true });

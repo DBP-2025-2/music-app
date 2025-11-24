@@ -744,14 +744,92 @@ export async function getCharts() {
 // GET /follows
 export async function getFollows() {
   const [rows] = await pool.query(`
-    SELECT
-      follower_id  AS followerId,
-      following_id AS followingId,
-      created_at   AS createdAt
-    FROM ${FOLLOWS_TABLE}
-    ORDER BY created_at DESC
+    SELECT follower_id AS followerId, following_id AS followingId, created_at AS createdAt
+    FROM ${FOLLOWS_TABLE} ORDER BY created_at DESC
   `);
   return rows;
+}
+
+// 유저/아티스트 찾기 헬퍼
+export async function findUserByEmail(email) {
+  const [rows] = await pool.query("SELECT user_id AS id, email, nickname FROM users WHERE email = ?", [email]);
+  return rows[0] || null;
+}
+
+export async function findUserByNickname(nickname) {
+  const [rows] = await pool.query("SELECT user_id AS id FROM users WHERE nickname = ?", [nickname]);
+  return rows[0] || null;
+}
+
+// ★ [중요] 유연한 검색 기능 (LIKE) 적용됨
+export async function findArtistByName(name) {
+  const trimmed = name.trim();
+  const searchNorm = trimmed.toLowerCase().replace(/\s+/g, ''); 
+
+  // 1단계: 정확한 일치
+  const [exactRows] = await pool.query(
+    "SELECT artist_id AS id, name FROM artists WHERE name = ? OR name_norm = ?", 
+    [trimmed, searchNorm]
+  );
+  if (exactRows.length > 0) return exactRows[0];
+
+  // 2단계: 부분 일치 (LIKE)
+  const [likeRows] = await pool.query(
+    "SELECT artist_id AS id, name FROM artists WHERE name LIKE ? OR name_norm LIKE ? LIMIT 1", 
+    [`%${trimmed}%`, `%${searchNorm}%`]
+  );
+  
+  return likeRows[0] || null;
+}
+
+// 팔로우 추가
+export async function createFollow(followerId, followingId, targetType) {
+  await pool.query(
+    "INSERT INTO follows (follower_id, following_id, target_type) VALUES (?, ?, ?)",
+    [followerId, followingId, targetType]
+  );
+}
+
+// 팔로우 취소
+export async function deleteFollow(followerId, followingId, targetType) {
+  const [result] = await pool.query(
+    "DELETE FROM follows WHERE follower_id = ? AND following_id = ? AND target_type = ?",
+    [followerId, followingId, targetType]
+  );
+  return result.affectedRows > 0;
+}
+
+// ★ [중요] 변수명 snake_case로 수정됨 (targetName -> target_name)
+export async function getMyFollows(followerId) {
+  const query = `
+    SELECT 
+      f.following_id AS following_id,
+      f.target_type  AS target_type,
+      f.created_at   AS created_at,
+      CASE 
+        WHEN f.target_type = 'user' THEN u.nickname 
+        WHEN f.target_type = 'artist' THEN a.name 
+      END AS target_name
+    FROM follows f
+    LEFT JOIN users u ON f.following_id = u.user_id AND f.target_type = 'user'
+    LEFT JOIN artists a ON f.following_id = a.artist_id AND f.target_type = 'artist'
+    WHERE f.follower_id = ?
+    ORDER BY f.created_at DESC
+  `;
+  const [rows] = await pool.query(query, [followerId]);
+  return rows;
+}
+
+// 추천 목록
+export async function getRecommendations(myEmail) {
+  const [users] = await pool.query(
+    "SELECT user_id AS userId, nickname, email FROM users WHERE email != ? ORDER BY created_at DESC LIMIT 5",
+    [myEmail || '']
+  );
+  const [artists] = await pool.query(
+    "SELECT artist_id AS artistId, name FROM artists ORDER BY created_at DESC LIMIT 5"
+  );
+  return { users, artists };
 }
 
 // --------------------------------------------------------------------
