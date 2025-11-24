@@ -26,6 +26,11 @@ export default function PlaylistsPage() {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
 
+  // 자동완성 상태
+  const [autocompleteResults, setAutocompleteResults] = useState([]);
+  const [autocompleting, setAutocompleting] = useState(false);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+
   // 공개 플레이리스트 검색 / 인기
   const [publicQuery, setPublicQuery] = useState("");
   const [publicMode, setPublicMode] = useState("search"); // "search" | "popular"
@@ -184,9 +189,7 @@ export default function PlaylistsPage() {
 
     try {
       setSearching(true);
-      const data = await fetchJson(
-        `${API}/songs?q=${encodeURIComponent(q)}`
-      );
+      const data = await fetchJson(`${API}/songs?q=${encodeURIComponent(q)}`);
       setSearchResults(data);
     } catch (e) {
       console.error(e);
@@ -224,15 +227,76 @@ export default function PlaylistsPage() {
   }
 
   // ─────────────────────────────
+  // 자동완성 검색
+  // ─────────────────────────────
+  async function handleAutocomplete(value) {
+    setQuery(value);
+    const q = value.trim();
+    if (!q || q.length < 1) {
+      setAutocompleteResults([]);
+      setShowAutocomplete(false);
+      return;
+    }
+
+    try {
+      setAutocompleting(true);
+      const data = await fetchJson(`${API}/songs?q=${encodeURIComponent(q)}`);
+
+      // 우선순위 정렬:
+      // 1순위 = 첫글자로 시작 (다, 달, 달콤 모두 '다'로 시작하면 최우선)
+      // 2순위 = 전체 검색어로 prefix 매칭
+      // 3순위 = 포함
+      const qLower = q.toLowerCase();
+      const firstChar = qLower[0];
+
+      const scored = (data || []).map((item) => {
+        const title = (item.title || "").toLowerCase();
+        const artist = (item.artistName || "").toLowerCase();
+        let score = 0;
+        if (title.startsWith(firstChar) || artist.startsWith(firstChar))
+          score = 3;
+        else if (title.startsWith(qLower) || artist.startsWith(qLower))
+          score = 2;
+        else if (title.includes(qLower) || artist.includes(qLower)) score = 1;
+        return { item, score };
+      });
+
+      scored.sort((a, b) => {
+        // 높은 score부터 정렬
+        if (b.score !== a.score) return b.score - a.score;
+        // 동일 점수면 제목 사전순
+        const A = (a.item.title || "").toLowerCase();
+        const B = (b.item.title || "").toLowerCase();
+        return A < B ? -1 : A > B ? 1 : 0;
+      });
+
+      const sorted = scored.map((s) => s.item);
+      setAutocompleteResults(sorted.slice(0, 5)); // 최대 5개
+      setShowAutocomplete(true);
+    } catch (e) {
+      console.error(e);
+      setAutocompleteResults([]);
+    } finally {
+      setAutocompleting(false);
+    }
+  }
+
+  function handleSelectFromAutocomplete(song) {
+    setQuery(song.title);
+    setSearchResults([song]); // 선택된 곡을 검색 결과로 설정
+    setShowAutocomplete(false);
+    setAutocompleteResults([]);
+  }
+
+  // ─────────────────────────────
   // 플레이리스트 내 곡 삭제
   // ─────────────────────────────
   async function handleRemoveItem(itemId) {
     if (!selectedId) return;
     try {
-      await fetchJson(
-        `${API}/playlists/${selectedId}/items/${itemId}`,
-        { method: "DELETE" }
-      );
+      await fetchJson(`${API}/playlists/${selectedId}/items/${itemId}`, {
+        method: "DELETE",
+      });
       await loadItems(selectedId);
     } catch (e) {
       console.error(e);
@@ -269,9 +333,7 @@ export default function PlaylistsPage() {
     try {
       setPublicLoading(true);
       setPublicMode("popular");
-      const data = await fetchJson(
-        `${API}/playlists/public?sort=followers`
-      );
+      const data = await fetchJson(`${API}/playlists/public?sort=followers`);
       setPublicResults(data);
       setPublicSelectedId(null);
       setPublicSelectedItems([]);
@@ -374,9 +436,7 @@ export default function PlaylistsPage() {
             <span>📂</span>
             <span>
               나의 플레이리스트{" "}
-              <span className="card-badge">
-                {playlists.length.toString()}
-              </span>
+              <span className="card-badge">{playlists.length.toString()}</span>
             </span>
           </div>
 
@@ -447,9 +507,7 @@ export default function PlaylistsPage() {
                 marginBottom: 12,
               }}
             >
-              <span style={{ fontSize: 14, fontWeight: 600 }}>
-                공개 설정
-              </span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>공개 설정</span>
               <label style={{ fontSize: 14 }}>
                 <input
                   type="radio"
@@ -497,9 +555,7 @@ export default function PlaylistsPage() {
           </div>
         )}
 
-        {loading && (
-          <p className="text-muted">플레이리스트 불러오는 중...</p>
-        )}
+        {loading && <p className="text-muted">플레이리스트 불러오는 중...</p>}
 
         {/* 좌측 목록 + 우측 곡 담기 */}
         <div
@@ -579,19 +635,18 @@ export default function PlaylistsPage() {
                         <div
                           style={{
                             position: "absolute",
-                            left: "-100px",     // ← 왼쪽으로 이동
+                            left: "-100px", // ← 왼쪽으로 이동
                             top: "-20%",
                             background: "#fff",
                             border: "1px solid #e5e7eb",
                             borderRadius: 8,
-                            boxShadow:
-                              "0 8px 16px rgba(15, 23, 42, 0.12)",
-                            
+                            boxShadow: "0 8px 16px rgba(15, 23, 42, 0.12)",
+
                             zIndex: 10,
 
-                            display: "flex",          // ← 가로 배치
-                            flexDirection: "row",     // ← 가로 방향
-                            gap: "6px",               // ← 버튼 간격
+                            display: "flex", // ← 가로 배치
+                            flexDirection: "row", // ← 가로 방향
+                            gap: "6px", // ← 버튼 간격
                           }}
                         >
                           <button
@@ -605,8 +660,6 @@ export default function PlaylistsPage() {
                           </button>
                         </div>
                       )}
-
-                      
                     </div>
                   </li>
                 );
@@ -620,10 +673,7 @@ export default function PlaylistsPage() {
                     border: "none",
                   }}
                 >
-                  <span
-                    className="text-muted"
-                    style={{ marginBottom: 8 }}
-                  >
+                  <span className="text-muted" style={{ marginBottom: 8 }}>
                     플레이리스트가 없습니다.
                   </span>
                   <button
@@ -640,10 +690,7 @@ export default function PlaylistsPage() {
           {/* 오른쪽: 선택된 플리 상세 + 곡 검색/추가 */}
           <div>
             <h3 style={{ marginBottom: 3 }}>
-              
-              {selectedPlaylist
-                ? selectedPlaylist.name
-                : "(선택 안 됨)"}
+              {selectedPlaylist ? selectedPlaylist.name : "(선택 안 됨)"}
             </h3>
 
             {!selectedId && (
@@ -663,9 +710,7 @@ export default function PlaylistsPage() {
                     background: "#f9fafb",
                   }}
                 >
-                  <div
-                    style={{ marginBottom: 8, fontWeight: 500 }}
-                  >
+                  <div style={{ marginBottom: 8, fontWeight: 500 }}>
                     검색해서 플레이리스트에 추가
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -673,8 +718,14 @@ export default function PlaylistsPage() {
                       className="field-input"
                       placeholder="제목 또는 가수를 입력하세요"
                       value={query}
-                      onChange={(e) => setQuery(e.target.value)}
+                      onChange={(e) => handleAutocomplete(e.target.value)}
                       onKeyDown={handleSearchKeyDown}
+                      onFocus={() =>
+                        query.length > 0 && setShowAutocomplete(true)
+                      }
+                      onBlur={() =>
+                        setTimeout(() => setShowAutocomplete(false), 200)
+                      }
                     />
                     <button
                       className="btn btn-secondary"
@@ -683,6 +734,58 @@ export default function PlaylistsPage() {
                       {searching ? "검색 중..." : "검색"}
                     </button>
                   </div>
+
+                  {/* 자동완성 드롭다운 */}
+                  {showAutocomplete && autocompleteResults.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: 4,
+                        border: "1px solid #ddd",
+                        borderRadius: 4,
+                        background: "#fff",
+                        maxHeight: 200,
+                        overflowY: "auto",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                      }}
+                    >
+                      <ul
+                        style={{
+                          listStyle: "none",
+                          padding: 0,
+                          margin: 0,
+                        }}
+                      >
+                        {autocompleteResults.map((song, idx) => (
+                          <li
+                            key={`${song.id}-${idx}`}
+                            style={{
+                              padding: "8px 12px",
+                              borderBottom: "1px solid #eee",
+                              cursor: "pointer",
+                              transition: "background 0.2s",
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.background = "#f0f0f0")
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.background = "#fff")
+                            }
+                            onClick={() => handleSelectFromAutocomplete(song)}
+                          >
+                            <strong>{song.title}</strong>
+                            {song.artistName && (
+                              <span
+                                style={{ color: "#666", fontSize: "0.9em" }}
+                              >
+                                {" "}
+                                · {song.artistName}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   {searchResults.length > 0 && (
                     <div
@@ -714,9 +817,7 @@ export default function PlaylistsPage() {
                             <button
                               type="button"
                               className="playlist-button"
-                              onClick={() =>
-                                handleAddItemBySong(song.id)
-                              }
+                              onClick={() => handleAddItemBySong(song.id)}
                               title="선택된 플레이리스트에 추가"
                             >
                               +
@@ -727,27 +828,18 @@ export default function PlaylistsPage() {
                     </div>
                   )}
 
-                  {!searching &&
-                    query.trim() &&
-                    searchResults.length === 0 && (
-                      <p
-                        className="text-muted"
-                        style={{ marginTop: 8 }}
-                      >
-                        검색 결과가 없습니다.
-                      </p>
-                    )}
+                  {!searching && query.trim() && searchResults.length === 0 && (
+                    <p className="text-muted" style={{ marginTop: 8 }}>
+                      검색 결과가 없습니다.
+                    </p>
+                  )}
                 </div>
 
                 {/* 플레이리스트에 담긴 곡 목록 */}
                 <div>
-                  <h4 style={{ marginBottom: 8 }}>
-                    플레이리스트 곡
-                  </h4>
+                  <h4 style={{ marginBottom: 8 }}>플레이리스트 곡</h4>
                   {loadingItems && (
-                    <p className="text-muted">
-                      곡 목록 불러오는 중...
-                    </p>
+                    <p className="text-muted">곡 목록 불러오는 중...</p>
                   )}
                   <ul className="list">
                     {items.map((item) => (
@@ -760,9 +852,7 @@ export default function PlaylistsPage() {
                       >
                         <span>
                           <strong>{item.position}.</strong>{" "}
-                          {item.songTitle && (
-                            <span>{item.songTitle}</span>
-                          )}
+                          {item.songTitle && <span>{item.songTitle}</span>}
                           {item.artistName && (
                             <span className="text-muted">
                               {" "}
@@ -785,27 +875,26 @@ export default function PlaylistsPage() {
                           </button>
                           {itemMenuOpenId === item.id && (
                             <div
-                                style={{
-                                    position: "absolute",
-                                    left: "-100px",
-                                    top: "-20%",
-                                    background: "#fff",
-                                    border: "1px solid #e5e7eb",
-                                    borderRadius: 8,
-                                    zIndex: 10,
-                                    display: "flex",
-                                    flexDirection: "row",
-                                    gap: "6px",
-                                }}
+                              style={{
+                                position: "absolute",
+                                left: "-100px",
+                                top: "-20%",
+                                background: "#fff",
+                                border: "1px solid #e5e7eb",
+                                borderRadius: 8,
+                                zIndex: 10,
+                                display: "flex",
+                                flexDirection: "row",
+                                gap: "6px",
+                              }}
                             >
-                                <button
-                                    className="btn btn-danger"
-                                    onClick={() => handleRemoveItem(item.id)}
-                                >
-                                    삭제
-                                </button>
+                              <button
+                                className="btn btn-danger"
+                                onClick={() => handleRemoveItem(item.id)}
+                              >
+                                삭제
+                              </button>
                             </div>
-
                           )}
                         </div>
                       </li>
@@ -840,25 +929,20 @@ export default function PlaylistsPage() {
             value={publicQuery}
             onChange={(e) => setPublicQuery(e.target.value)}
           />
-          <button
-            className="btn btn-secondary"
-            onClick={handleSearchPublic}
-          >
-            {publicLoading && publicMode === "search"
-              ? "검색 중..."
-              : "검색"}
+          <button className="btn btn-secondary" onClick={handleSearchPublic}>
+            {publicLoading && publicMode === "search" ? "검색 중..." : "검색"}
           </button>
 
           <button
             className="btn btn-secondary"
-            style={{ 
+            style={{
               marginLeft: "auto",
               background: "linear-gradient(135deg, #8b5cf6, #7c3aed)", // 🔥 배경
-              color: "#ffffff",                                      // 🔥 글자색
-              fontWeight: "600",                                     // 🔥 폰트 굵기
-              fontSize: "14px",                                      // 🔥 폰트 크기
-              border: "none",    
-             }}
+              color: "#ffffff", // 🔥 글자색
+              fontWeight: "600", // 🔥 폰트 굵기
+              fontSize: "14px", // 🔥 폰트 크기
+              border: "none",
+            }}
             onClick={handleLoadPopularPublic}
           >
             {publicLoading && publicMode === "popular"
@@ -868,9 +952,7 @@ export default function PlaylistsPage() {
         </div>
 
         {publicLoading && (
-          <p className="text-muted">
-            공개 플레이리스트 불러오는 중...
-          </p>
+          <p className="text-muted">공개 플레이리스트 불러오는 중...</p>
         )}
 
         {!publicLoading && publicResults.length === 0 && (
@@ -893,9 +975,7 @@ export default function PlaylistsPage() {
             <div className="public-playlist-body">
               {publicResults.map((pl, index) => {
                 const rank = index + 1;
-                const followerCount = Number(
-                  pl.followerCount ?? 0
-                );
+                const followerCount = Number(pl.followerCount ?? 0);
                 const ratio = followerCount / maxFollowers;
 
                 const rankClass =
@@ -913,23 +993,16 @@ export default function PlaylistsPage() {
                   <div key={pl.id}>
                     {/* ▶ 한 줄 전체 클릭 가능 */}
                     <div
-                      className={
-                        "public-playlist-row" + rankClass
-                      }
-                      onClick={() =>
-                        handleTogglePublicPlaylist(pl.id)
-                      }
+                      className={"public-playlist-row" + rankClass}
+                      onClick={() => handleTogglePublicPlaylist(pl.id)}
                       style={{ cursor: "pointer" }}
                     >
                       <div className="col-rank">{rank}</div>
 
                       <div className="col-main">
-                        <div className="public-playlist-title">
-                          {pl.name}
-                        </div>
+                        <div className="public-playlist-title">{pl.name}</div>
                         <div className="public-playlist-meta">
-                          만든이:{" "}
-                          {pl.ownerNickname || "알 수 없음"}
+                          만든이: {pl.ownerNickname || "알 수 없음"}
                           {" · "}곡 {pl.trackCount ?? 0}개
                         </div>
 
@@ -938,27 +1011,20 @@ export default function PlaylistsPage() {
                           <div
                             className="public-playlist-bar"
                             style={{
-                              width: `${Math.max(
-                                8,
-                                ratio * 100
-                              )}%`,
+                              width: `${Math.max(8, ratio * 100)}%`,
                             }}
                           />
                         </div>
                       </div>
 
-                      <div className="col-followers">
-                        {followerCount}명
-                      </div>
+                      <div className="col-followers">{followerCount}명</div>
 
                       <div className="col-actions">
                         <button
                           className="btn btn-secondary"
                           onClick={(e) => {
                             e.stopPropagation();
-                            alert(
-                              "팔로우 기능은 아직 미구현입니다 :)"
-                            );
+                            alert("팔로우 기능은 아직 미구현입니다 :)");
                           }}
                         >
                           팔로우
@@ -970,88 +1036,71 @@ export default function PlaylistsPage() {
                     {isOpened && (
                       <div className="public-playlist-detail">
                         {publicItemsLoading && (
-                          <p className="text-muted">
-                            곡 목록 불러오는 중...
-                          </p>
+                          <p className="text-muted">곡 목록 불러오는 중...</p>
                         )}
 
                         {publicItemsError && (
-                          <p className="text-error">
-                            ⚠ {publicItemsError}
-                          </p>
+                          <p className="text-error">⚠ {publicItemsError}</p>
                         )}
 
-                        {!publicItemsLoading &&
-                          !publicItemsError && (
-                            <>
-                              {publicSelectedItems.length ===
-                              0 ? (
-                                <p className="text-muted">
-                                  이 플레이리스트에 곡 정보가
-                                  없습니다.
-                                </p>
-                              ) : (
-                                <div className="public-playlist-songs">
-                                  {/* 헤더 */}
-                                  <div className="public-playlist-songs-header">
-                                    <span className="col-rank">
-                                      순번
-                                    </span>
-                                    <span className="col-title">
-                                      곡명
-                                    </span>
-                                    <span className="col-artist">
-                                      가수
-                                    </span>
-                                  </div>
-
-                                  {/* 곡 리스트 */}
-                                  <div className="public-playlist-songs-body">
-                                    {publicSelectedItems.map(
-                                      (item, index2) => (
-                                        <div
-                                          key={item.id}
-                                          className="public-playlist-songs-row"
-                                        >
-                                          <div className="col-rank">
-                                            {index2 + 1}
-                                          </div>
-
-                                          <div className="col-title">
-                                            <div className="song-with-add">
-                                              <span className="song-title">
-                                                {item.songTitle ||
-                                                  item.title}
-                                              </span>
-                                              <button
-                                                type="button"
-                                                className="playlist-button"
-                                                onClick={() =>
-                                                  handleOpenPlaylistPicker(
-                                                    item.songId ||
-                                                      item.song_id
-                                                  )
-                                                }
-                                                title="내 플레이리스트에 추가"
-                                              >
-                                                +
-                                              </button>
-                                            </div>
-                                          </div>
-
-                                          <div className="col-artist">
-                                            {item.artistName ||
-                                              item.artist_name ||
-                                              "-"}
-                                          </div>
-                                        </div>
-                                      )
-                                    )}
-                                  </div>
+                        {!publicItemsLoading && !publicItemsError && (
+                          <>
+                            {publicSelectedItems.length === 0 ? (
+                              <p className="text-muted">
+                                이 플레이리스트에 곡 정보가 없습니다.
+                              </p>
+                            ) : (
+                              <div className="public-playlist-songs">
+                                {/* 헤더 */}
+                                <div className="public-playlist-songs-header">
+                                  <span className="col-rank">순번</span>
+                                  <span className="col-title">곡명</span>
+                                  <span className="col-artist">가수</span>
                                 </div>
-                              )}
-                            </>
-                          )}
+
+                                {/* 곡 리스트 */}
+                                <div className="public-playlist-songs-body">
+                                  {publicSelectedItems.map((item, index2) => (
+                                    <div
+                                      key={item.id}
+                                      className="public-playlist-songs-row"
+                                    >
+                                      <div className="col-rank">
+                                        {index2 + 1}
+                                      </div>
+
+                                      <div className="col-title">
+                                        <div className="song-with-add">
+                                          <span className="song-title">
+                                            {item.songTitle || item.title}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            className="playlist-button"
+                                            onClick={() =>
+                                              handleOpenPlaylistPicker(
+                                                item.songId || item.song_id
+                                              )
+                                            }
+                                            title="내 플레이리스트에 추가"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      <div className="col-artist">
+                                        {item.artistName ||
+                                          item.artist_name ||
+                                          "-"}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1066,66 +1115,52 @@ export default function PlaylistsPage() {
       {playlistPickerOpen && (
         <div className="playlist-modal-backdrop">
           <div className="playlist-modal">
-            <h3 className="playlist-modal-title">
-              플레이리스트에 추가
-            </h3>
+            <h3 className="playlist-modal-title">플레이리스트에 추가</h3>
 
             {playlistPickerLoading && (
-              <p className="text-muted">
-                플레이리스트 불러오는 중...
-              </p>
+              <p className="text-muted">플레이리스트 불러오는 중...</p>
             )}
 
             {playlistPickerError && (
-              <p className="text-error">
-                ⚠ {playlistPickerError}
+              <p className="text-error">⚠ {playlistPickerError}</p>
+            )}
+
+            {!playlistPickerLoading && myPlaylists.length === 0 && (
+              <p className="text-muted">
+                아직 생성된 플레이리스트가 없습니다. <br />
+                먼저 플레이리스트를 만들어 주세요.
               </p>
             )}
 
-            {!playlistPickerLoading &&
-              myPlaylists.length === 0 && (
-                <p className="text-muted">
-                  아직 생성된 플레이리스트가 없습니다. <br />
-                  먼저 플레이리스트를 만들어 주세요.
-                </p>
-              )}
-
-            {!playlistPickerLoading &&
-              myPlaylists.length > 0 && (
-                <ul className="playlist-modal-list">
-                  {myPlaylists.map((pl) => {
-                    const isPublic =
-                      pl.isPublic ?? pl.is_public ?? true;
-                    return (
-                      <li
-                        key={pl.id}
-                        className="playlist-modal-item"
+            {!playlistPickerLoading && myPlaylists.length > 0 && (
+              <ul className="playlist-modal-list">
+                {myPlaylists.map((pl) => {
+                  const isPublic = pl.isPublic ?? pl.is_public ?? true;
+                  return (
+                    <li key={pl.id} className="playlist-modal-item">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectPlaylistForSong(pl.id)}
                       >
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleSelectPlaylistForSong(pl.id)
+                        <span className="playlist-modal-name">
+                          #{pl.id} {pl.name}
+                        </span>
+                        <span
+                          className={
+                            "playlist-modal-badge " +
+                            (isPublic
+                              ? "playlist-modal-badge--public"
+                              : "playlist-modal-badge--private")
                           }
                         >
-                          <span className="playlist-modal-name">
-                            #{pl.id} {pl.name}
-                          </span>
-                          <span
-                            className={
-                              "playlist-modal-badge " +
-                              (isPublic
-                                ? "playlist-modal-badge--public"
-                                : "playlist-modal-badge--private")
-                            }
-                          >
-                            {isPublic ? "공개" : "비공개"}
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+                          {isPublic ? "공개" : "비공개"}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
 
             <button
               type="button"

@@ -15,6 +15,7 @@ export default function AlbumsPage() {
   const [editArtistId, setEditArtistId] = useState("");
   const [editYear, setEditYear] = useState("");
 
+  const [q, setQ] = useState("");
   const [sort, setSort] = useState("year-desc"); // 최신 우선
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -48,15 +49,24 @@ export default function AlbumsPage() {
   }, []);
 
   const sorted = useMemo(() => {
+    let data = albums;
+    const t = q.trim().toLowerCase();
+    if (t) {
+      // 가수 이름으로 필터링
+      data = data.filter((a) => {
+        const artistName = (artistNameById.get(a.artistId) || "").toLowerCase();
+        return artistName.includes(t);
+      });
+    }
     const [k, dir] = sort.split("-"); // year-desc / year-asc / title-asc
-    return [...albums].sort((A, B) => {
+    return [...data].sort((A, B) => {
       const a = A[k] ?? "";
       const b = B[k] ?? "";
       if (a < b) return dir === "asc" ? -1 : 1;
       if (a > b) return dir === "asc" ? 1 : -1;
       return 0;
     });
-  }, [albums, sort]);
+  }, [albums, sort, q, artistNameById]);
 
   const add = async (e) => {
     e.preventDefault();
@@ -134,8 +144,14 @@ export default function AlbumsPage() {
         </div>
 
         <div className="content-panel">
-          {/* 정렬 */}
+          {/* 검색 & 정렬 */}
           <div className="search-toolbar">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="🔍 가수 이름으로 검색..."
+              style={{ flex: 1 }}
+            />
             <select value={sort} onChange={(e) => setSort(e.target.value)}>
               <option value="year-desc">📅 연도 (최신순)</option>
               <option value="year-asc">📅 연도 (오래된순)</option>
