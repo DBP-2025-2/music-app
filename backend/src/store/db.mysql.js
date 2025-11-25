@@ -761,19 +761,17 @@ export async function findUserByNickname(nickname) {
   return rows[0] || null;
 }
 
-// ★ [중요] 유연한 검색 기능 (LIKE) 적용됨
+// 검색 기능 (LIKE) 적용됨
 export async function findArtistByName(name) {
   const trimmed = name.trim();
   const searchNorm = trimmed.toLowerCase().replace(/\s+/g, ''); 
 
-  // 1단계: 정확한 일치
   const [exactRows] = await pool.query(
     "SELECT artist_id AS id, name FROM artists WHERE name = ? OR name_norm = ?", 
     [trimmed, searchNorm]
   );
   if (exactRows.length > 0) return exactRows[0];
 
-  // 2단계: 부분 일치 (LIKE)
   const [likeRows] = await pool.query(
     "SELECT artist_id AS id, name FROM artists WHERE name LIKE ? OR name_norm LIKE ? LIMIT 1", 
     [`%${trimmed}%`, `%${searchNorm}%`]
@@ -799,7 +797,6 @@ export async function deleteFollow(followerId, followingId, targetType) {
   return result.affectedRows > 0;
 }
 
-// ★ [중요] 변수명 snake_case로 수정됨 (targetName -> target_name)
 export async function getMyFollows(followerId) {
   const query = `
     SELECT 
@@ -836,7 +833,7 @@ export async function getRecommendations(myEmail) {
 // Play History (READ-ONLY)
 // --------------------------------------------------------------------
 
-// 1. 검색용 모든 노래 가져오기 (가수 이름 포함)
+// 검색용 모든 노래 가져오기 (가수 이름 포함)
 export async function getAllSongsForHistory() {
   const [rows] = await pool.query(`
     SELECT 
@@ -851,7 +848,7 @@ export async function getAllSongsForHistory() {
   return rows;
 }
 
-// 2. 재생 기록 저장 + 조회수 증가 (트랜잭션)
+// 재생 기록 저장 + 조회수 증가 (트랜잭션)
 export async function addPlayHistory(userId, songId) {
   const conn = await pool.getConnection();
   try {
@@ -878,7 +875,7 @@ export async function addPlayHistory(userId, songId) {
   }
 }
 
-// 3. 내 재생 기록 조회 (최신순 20개)
+// 내 재생 기록 조회 (최신순 20개)
 export async function getMyPlayHistory(userId) {
   const [rows] = await pool.query(`
     SELECT 

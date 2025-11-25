@@ -17,7 +17,6 @@ const router = Router();
 // 1) 내 팔로우 목록 조회
 router.get("/list", authMiddleware, async (req, res, next) => {
   try {
-    // authMiddleware를 통과하면 req.user.userId에 내 ID가 들어있습니다.
     const myId = req.user.userId; 
 
     // 목록 조회

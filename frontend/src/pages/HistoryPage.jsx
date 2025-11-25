@@ -20,7 +20,6 @@ export default function PlayHistoryPage() {
   async function loadData() {
     try {
       setLoading(true);
-      // 두 가지 데이터를 병렬로 가져옵니다.
       const [historyData, songsData] = await Promise.all([
         fetchJson(`${API}/play-history/list`),
         fetchJson(`${API}/play-history/songs`), // 검색용 노래 목록
@@ -35,7 +34,7 @@ export default function PlayHistoryPage() {
     }
   }
 
-  // 2. 검색 로직 (클라이언트 사이드 필터링)
+  // 검색 로직 (클라이언트 사이드 필터링)
   const searchResults = useMemo(() => {
     if (!searchTerm.trim()) return [];
     const lowerQuery = searchTerm.toLowerCase();
