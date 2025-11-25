@@ -50,18 +50,17 @@ router.get("/weekly", authMiddleware, async (req, res, next) => {
     const userId = req.user?.userId ?? null;
 
     const [rows] = await db.pool.query(
-      `
+ `
       SELECT
         c.rank,
         s.song_id,
         s.title  AS song_title,
-        ar.name  AS artist_name,
+        
+        -- [수정 1] 여러 아티스트를 쉼표(,)로 합쳐서 가져오기
+        GROUP_CONCAT(DISTINCT ar.name ORDER BY sa.display_order SEPARATOR ', ') AS artist_name,
+        
         al.title AS album_title,
-
-        -- 🔹 곡별 총 좋아요 수 (중복 제거 후 카운트)
         COALESCE(l.total_likes, 0) AS total_likes,
-
-        -- 🔹 현재 유저가 좋아요 눌렀는지만 체크 (중복 있어도 0/1)
         CASE WHEN ul.user_id IS NULL THEN 0 ELSE 1 END AS user_liked
 
       FROM charts c
@@ -70,14 +69,15 @@ router.get("/weekly", authMiddleware, async (req, res, next) => {
       LEFT JOIN albums al
         ON s.album_id = al.album_id
 
-      -- ✅ 대표 아티스트 한 명만 (듀엣 뻥튀기 방지)
+      -- [수정 2] 기존에는 sa.display_order = 1 조건 때문에 한 명만 나왔거나, 
+      -- 조건을 빼면 뻥튀기 되었을 것입니다. 
+      -- 모든 아티스트를 다 가져오기 위해 조건을 풉니다.
       LEFT JOIN song_artists sa
         ON sa.song_id = s.song_id
-       AND sa.display_order = 1
       LEFT JOIN artists ar
         ON ar.artist_id = sa.artist_id
 
-      -- ✅ 곡별 총 좋아요 수 서브쿼리 (중복 likes도 합쳐서 한 줄)
+      -- 곡별 총 좋아요 수
       LEFT JOIN (
         SELECT song_id, COUNT(DISTINCT like_id) AS total_likes
         FROM likes
@@ -85,7 +85,7 @@ router.get("/weekly", authMiddleware, async (req, res, next) => {
       ) l
         ON l.song_id = s.song_id
 
-      -- ✅ 유저별 좋아요도 서브쿼리로 1줄만 남기기
+      -- 유저별 좋아요 여부
       LEFT JOIN (
         SELECT song_id, user_id
         FROM likes
@@ -97,6 +97,16 @@ router.get("/weekly", authMiddleware, async (req, res, next) => {
       WHERE c.chart_type = ?
         AND c.year       = ?
         AND c.week       = ?
+      
+      -- [수정 3] ★가장 중요★ 노래 ID 기준으로 그룹핑을 해야 중복이 사라집니다.
+      GROUP BY 
+        c.rank, 
+        s.song_id, 
+        s.title, 
+        al.title, 
+        l.total_likes, 
+        ul.user_id
+
       ORDER BY c.rank ASC
       `,
       [userId, type, Number(year), Number(week)]
@@ -122,15 +132,13 @@ router.get("/top-liked", authMiddleware, async (req, res, next) => {
       SELECT
         s.song_id,
         s.title                  AS song_title,
-        a.name                   AS artist_name,
+        
+        -- [수정] 여기도 GROUP_CONCAT 적용해야 함
+        GROUP_CONCAT(DISTINCT a.name SEPARATOR ', ') AS artist_name,
+        
         al.title                 AS album_title,
         COUNT(DISTINCT l.like_id) AS total_likes,
-        MAX(
-          CASE
-            WHEN l.user_id = ? THEN 1
-            ELSE 0
-          END
-        )                        AS user_liked
+        MAX(CASE WHEN l.user_id = ? THEN 1 ELSE 0 END) AS user_liked
       FROM charts c
       JOIN songs s          ON c.song_id = s.song_id
       LEFT JOIN song_artists sa ON sa.song_id = s.song_id
@@ -138,10 +146,11 @@ router.get("/top-liked", authMiddleware, async (req, res, next) => {
       LEFT JOIN albums al   ON s.album_id = al.album_id
       LEFT JOIN likes l     ON l.song_id = s.song_id
       WHERE c.year = ?
+      
+      -- [수정] GROUP BY에서 a.name을 빼야 합쳐짐
       GROUP BY
         s.song_id,
         s.title,
-        a.name,
         al.title
       ORDER BY
         total_likes DESC,
