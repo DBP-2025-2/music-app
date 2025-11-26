@@ -19,7 +19,18 @@ export default function SongsPage() {
 
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [playing, setPlaying] = useState(null); // 재생 중인 노래 ID
   const [error, setError] = useState("");
+
+  // 추천곡
+  const [recommendations, setRecommendations] = useState([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+
+  // 상세 정보 모달
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [selectedSong, setSelectedSong] = useState(null);
+  const [songCharts, setSongCharts] = useState([]);
+  const [chartsLoading, setChartsLoading] = useState(false);
 
   const artistNameById = useMemo(() => {
     const m = new Map();
@@ -48,7 +59,13 @@ export default function SongsPage() {
 
   useEffect(() => {
     loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterArtist]);
+
+  useEffect(() => {
+    loadRecommendations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [songs]);
 
   const add = async (e) => {
     e.preventDefault();
@@ -106,6 +123,97 @@ export default function SongsPage() {
     }
   };
 
+  // 재생 함수
+  const handlePlay = async (song) => {
+    try {
+      setPlaying(song.id);
+      await fetchJson(`${API}/play-history`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ song_id: song.id }),
+      });
+      alert(`🎵 '${song.title}' 재생 시작!`);
+      setPlaying(null);
+    } catch (e) {
+      alert(e.message || "재생 실패");
+      setPlaying(null);
+    }
+  };
+
+  // 추천곡 로드
+  // 로직: 노래 목록 중 첫 번째 곡을 기준으로 추천곡을 가져옴
+  // 첫 곡이 차트 기록이 없으면 다음 곡을 시도 (최대 5개 곡까지)
+  // 선택된 곡이 올랐던 차트 기간(연도, 주차)에 같이 올랐던 다른 곡들을 추천
+  const loadRecommendations = async () => {
+    if (songs.length === 0) return;
+    try {
+      setRecommendationsLoading(true);
+
+      let recs = [];
+
+      // 차트 기록이 있는 첫 곡 찾기
+      for (let i = 0; i < Math.min(songs.length, 5); i++) {
+        const songId = songs[i].id;
+        const songTitle = songs[i].title;
+
+        console.log(`🎵 [${i + 1}] 시도: ID=${songId}, 제목="${songTitle}"`);
+
+        const recsForThisSong = await fetchJson(
+          `${API}/songs/${songId}/recommendations`
+        );
+
+        if (recsForThisSong && recsForThisSong.length > 0) {
+          console.log(
+            `✅ 성공! ${songTitle}을(를) 기준으로 ${recsForThisSong.length}개의 추천곡 획득`
+          );
+          console.log(
+            `📊 추천곡 기준: 이 곡이 올랐던 차트 기간과 같은 기간에 올랐던 다른 곡들`
+          );
+          recs = recsForThisSong;
+          break;
+        } else {
+          console.log(`❌ 차트 기록 없음: ${songTitle}`);
+        }
+      }
+
+      if (recs.length > 0) {
+        console.log(
+          `🎯 최종 추천곡 데이터:`,
+          recs.map((r) => `${r.title} (${r.artistName})`).join(", ")
+        );
+      }
+
+      setRecommendations(recs || []);
+    } catch (e) {
+      console.error("❌ 추천곡 로드 에러:", e);
+      setRecommendations([]);
+    } finally {
+      setRecommendationsLoading(false);
+    }
+  };
+
+  // 상세 정보 모달 열기
+  const handleOpenDetail = async (song) => {
+    try {
+      setSelectedSong(song);
+      setDetailModalOpen(true);
+      setChartsLoading(true);
+      const charts = await fetchJson(`${API}/songs/${song.id}/charts`);
+      setSongCharts(charts || []);
+    } catch (e) {
+      console.error(e);
+      setSongCharts([]);
+    } finally {
+      setChartsLoading(false);
+    }
+  };
+
+  const handleCloseDetail = () => {
+    setDetailModalOpen(false);
+    setSelectedSong(null);
+    setSongCharts([]);
+  };
+
   // 검색/정렬 적용
   const view = useMemo(() => {
     let data = songs;
@@ -135,6 +243,54 @@ export default function SongsPage() {
         </div>
 
         <div className="content-panel">
+          {/* 추천곡 섹션 */}
+          <div style={{ marginBottom: 40 }}>
+            <h2 style={{ margin: 0, marginBottom: 20 }}>💡 추천곡</h2>
+
+            {recommendationsLoading ? (
+              <p style={{ color: "#888" }}>로딩 중...</p>
+            ) : recommendations.length === 0 ? (
+              <p style={{ color: "#888" }}>추천할 곡이 없습니다.</p>
+            ) : (
+              <div
+                style={{
+                  overflowX: "auto",
+                  display: "flex",
+                  gap: 16,
+                  paddingBottom: 12,
+                  scrollBehavior: "smooth",
+                }}
+              >
+                {recommendations.map((rec) => (
+                  <div
+                    key={rec.id}
+                    className="item-card"
+                    style={{
+                      minWidth: 220,
+                      flex: "0 0 220px",
+                    }}
+                  >
+                    <div className="item-card-header">
+                      <h3 className="item-card-title">{rec.title}</h3>
+                    </div>
+                    <div className="item-card-meta">
+                      <span>👤 {rec.artistName || "Unknown"}</span>
+                    </div>
+                    <div className="item-card-actions">
+                      <button
+                        className="btn primary"
+                        onClick={() => handlePlay(rec)}
+                        disabled={playing === rec.id}
+                      >
+                        {playing === rec.id ? "▶️ 재생 중..." : "▶️ 재생"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* 검색 & 필터 & 정렬 */}
           <div className="search-toolbar">
             <select
@@ -274,6 +430,19 @@ export default function SongsPage() {
                       </div>
                       <div className="item-card-actions">
                         <button
+                          className="btn primary"
+                          onClick={() => handlePlay(s)}
+                          disabled={playing === s.id}
+                        >
+                          {playing === s.id ? "▶️ 재생 중..." : "▶️ 재생"}
+                        </button>
+                        <button
+                          className="btn ghost"
+                          onClick={() => handleOpenDetail(s)}
+                        >
+                          ℹ️ 상세
+                        </button>
+                        <button
                           className="btn ghost"
                           onClick={() => {
                             setEditId(s.id);
@@ -299,6 +468,189 @@ export default function SongsPage() {
           )}
         </div>
       </div>
+
+      {/* 상세 정보 모달 */}
+      {detailModalOpen && selectedSong && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={handleCloseDetail}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 8,
+              maxWidth: 600,
+              width: "90%",
+              maxHeight: "80vh",
+              overflow: "auto",
+              boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 헤더 */}
+            <div
+              style={{
+                padding: 20,
+                borderBottom: "1px solid #eee",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <h2 style={{ margin: 0 }}>🎵 {selectedSong.title}</h2>
+              <button
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 24,
+                  cursor: "pointer",
+                }}
+                onClick={handleCloseDetail}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 내용 */}
+            <div style={{ padding: 20 }}>
+              {/* 기본 정보 */}
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{ marginTop: 0, marginBottom: 12 }}>기본 정보</h3>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
+                  <div>
+                    <strong>곡 ID:</strong> {selectedSong.id}
+                  </div>
+                  <div>
+                    <strong>아티스트:</strong>{" "}
+                    {artistNameById.get(selectedSong.artistId) || "Unknown"}
+                  </div>
+                </div>
+              </div>
+
+              {/* 차트 기록 */}
+              <div>
+                <h3 style={{ marginTop: 0, marginBottom: 12 }}>📊 차트 기록</h3>
+                {chartsLoading ? (
+                  <p style={{ color: "#888" }}>로딩 중...</p>
+                ) : songCharts.length === 0 ? (
+                  <p style={{ color: "#888" }}>차트 기록이 없습니다.</p>
+                ) : (
+                  <div
+                    style={{
+                      border: "1px solid #eee",
+                      borderRadius: 4,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                      }}
+                    >
+                      <thead>
+                        <tr style={{ background: "#f5f5f5" }}>
+                          <th
+                            style={{
+                              padding: 12,
+                              textAlign: "left",
+                              borderBottom: "1px solid #ddd",
+                              fontWeight: 600,
+                            }}
+                          >
+                            연도
+                          </th>
+                          <th
+                            style={{
+                              padding: 12,
+                              textAlign: "left",
+                              borderBottom: "1px solid #ddd",
+                              fontWeight: 600,
+                            }}
+                          >
+                            주차
+                          </th>
+                          <th
+                            style={{
+                              padding: 12,
+                              textAlign: "left",
+                              borderBottom: "1px solid #ddd",
+                              fontWeight: 600,
+                            }}
+                          >
+                            순위
+                          </th>
+                          <th
+                            style={{
+                              padding: 12,
+                              textAlign: "left",
+                              borderBottom: "1px solid #ddd",
+                              fontWeight: 600,
+                            }}
+                          >
+                            기간
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {songCharts.map((chart, idx) => (
+                          <tr
+                            key={idx}
+                            style={{
+                              borderBottom:
+                                idx < songCharts.length - 1
+                                  ? "1px solid #eee"
+                                  : "none",
+                            }}
+                          >
+                            <td style={{ padding: 12 }}>{chart.year}</td>
+                            <td style={{ padding: 12 }}>{chart.week}주차</td>
+                            <td style={{ padding: 12 }}>
+                              <strong>#{chart.rank}</strong>
+                            </td>
+                            <td
+                              style={{
+                                padding: 12,
+                                fontSize: "0.9em",
+                                color: "#666",
+                              }}
+                            >
+                              {chart.weekStartDate
+                                ? new Date(
+                                    chart.weekStartDate
+                                  ).toLocaleDateString()
+                                : "-"}{" "}
+                              ~{" "}
+                              {chart.weekEndDate
+                                ? new Date(
+                                    chart.weekEndDate
+                                  ).toLocaleDateString()
+                                : "-"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

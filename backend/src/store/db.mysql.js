@@ -406,7 +406,6 @@ export async function deleteSong(id) {
 // Playlists
 // --------------------------------------------------------------------
 
-
 // GET /playlists  → 내 플레이리스트
 export async function getPlaylists(userId) {
   const [rows] = await pool.query(
@@ -426,7 +425,12 @@ export async function getPlaylists(userId) {
 }
 
 // POST /playlists
-export async function createPlaylist({ userId, name, isPublic = true, note = "" }) {
+export async function createPlaylist({
+  userId,
+  name,
+  isPublic = true,
+  note = "",
+}) {
   const [result] = await pool.query(
     `
     INSERT INTO ${PLAYLISTS_TABLE}
@@ -489,7 +493,6 @@ export async function searchSongs({ q }) {
 
   return rows;
 }
-
 
 export async function searchPublicPlaylists({ q }) {
   const params = [];
@@ -580,8 +583,6 @@ export async function getPopularPublicPlaylists({ limit = 50 } = {}) {
   return rows;
 }
 
-
-
 // DELETE /playlists/:id
 export async function deletePlaylist(id) {
   const conn = await pool.getConnection();
@@ -654,8 +655,6 @@ export async function getPlaylistItems(playlistId) {
 
   return rows;
 }
-
-
 
 // POST /playlists/:id/items
 export async function addPlaylistItem({ playlistId, songId }) {
@@ -737,6 +736,94 @@ export async function getCharts() {
   }));
 }
 
+// GET /songs/:id/charts - 특정 노래의 차트 기록
+export async function getSongCharts(songId) {
+  console.log(`📊 [getSongCharts] Querying charts for songId: ${songId}`);
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT
+        chart_id AS id,
+        chart_type AS chartType,
+        year,
+        week,
+        \`rank\` AS \`rank\`,
+        week_start_date AS weekStartDate,
+        week_end_date AS weekEndDate
+      FROM ${CHARTS_TABLE}
+      WHERE song_id = ?
+      ORDER BY year DESC, week DESC
+      `,
+      [songId]
+    );
+
+    console.log(`📊 [getSongCharts] Found ${rows.length} records for songId: ${songId}`);
+    return rows;
+  } catch (error) {
+    console.error(`❌ [getSongCharts] Error querying charts:`, error.message);
+    console.error(`❌ SQL Error:`, error);
+    throw error;
+  }
+}
+
+// GET /songs/:id/recommendations - 특정 노래와 같은 차트 기간에 올랐던 곡들 추천
+export async function getRecommendedSongs(songId) {
+  console.log(`🎵 [getRecommendedSongs] Getting recommendations for songId: ${songId}`);
+  try {
+    // 1) 해당 곡이 올랐던 차트 기간들 조회
+    const [chartPeriods] = await pool.query(
+      `
+      SELECT DISTINCT year, week
+      FROM ${CHARTS_TABLE}
+      WHERE song_id = ?
+      LIMIT 5
+      `,
+      [songId]
+    );
+
+    if (chartPeriods.length === 0) {
+      console.log(`🎵 [getRecommendedSongs] No chart records found for songId: ${songId}`);
+      return [];
+    }
+
+    // 2) 같은 차트 기간에 올랐던 다른 곡들 조회
+    const placeholders = chartPeriods.map(() => "(c.year = ? AND c.week = ?)").join(" OR ");
+    const params = [];
+    chartPeriods.forEach((period) => {
+      params.push(period.year, period.week);
+    });
+    params.push(songId); // WHERE song_id != ?
+
+    const [recommendedRows] = await pool.query(
+      `
+      SELECT DISTINCT
+        s.song_id AS id,
+        s.title,
+        a.name AS artistName,
+        COUNT(DISTINCT (c.year * 100 + c.week)) AS chartCount
+      FROM ${CHARTS_TABLE} c
+      JOIN ${SONGS_TABLE} s ON c.song_id = s.song_id
+      LEFT JOIN ${SONG_ARTISTS_TABLE} sa ON s.song_id = sa.song_id
+      LEFT JOIN ${ARTISTS_TABLE} a ON sa.artist_id = a.artist_id
+      WHERE (${placeholders})
+      AND c.song_id != ?
+      GROUP BY s.song_id, s.title, a.name
+      ORDER BY chartCount DESC, s.song_id DESC
+      LIMIT 10
+      `,
+      params
+    );
+
+    console.log(
+      `🎵 [getRecommendedSongs] Found ${recommendedRows.length} recommendations for songId: ${songId}`
+    );
+    return recommendedRows;
+  } catch (error) {
+    console.error(`❌ [getRecommendedSongs] Error:`, error.message);
+    throw error;
+  }
+}
+
 // --------------------------------------------------------------------
 // Follows  (READ-ONLY 목록용)
 // --------------------------------------------------------------------
@@ -752,31 +839,37 @@ export async function getFollows() {
 
 // 유저/아티스트 찾기 헬퍼
 export async function findUserByEmail(email) {
-  const [rows] = await pool.query("SELECT user_id AS id, email, nickname FROM users WHERE email = ?", [email]);
+  const [rows] = await pool.query(
+    "SELECT user_id AS id, email, nickname FROM users WHERE email = ?",
+    [email]
+  );
   return rows[0] || null;
 }
 
 export async function findUserByNickname(nickname) {
-  const [rows] = await pool.query("SELECT user_id AS id FROM users WHERE nickname = ?", [nickname]);
+  const [rows] = await pool.query(
+    "SELECT user_id AS id FROM users WHERE nickname = ?",
+    [nickname]
+  );
   return rows[0] || null;
 }
 
 // 검색 기능 (LIKE) 적용됨
 export async function findArtistByName(name) {
   const trimmed = name.trim();
-  const searchNorm = trimmed.toLowerCase().replace(/\s+/g, ''); 
+  const searchNorm = trimmed.toLowerCase().replace(/\s+/g, "");
 
   const [exactRows] = await pool.query(
-    "SELECT artist_id AS id, name FROM artists WHERE name = ? OR name_norm = ?", 
+    "SELECT artist_id AS id, name FROM artists WHERE name = ? OR name_norm = ?",
     [trimmed, searchNorm]
   );
   if (exactRows.length > 0) return exactRows[0];
 
   const [likeRows] = await pool.query(
-    "SELECT artist_id AS id, name FROM artists WHERE name LIKE ? OR name_norm LIKE ? LIMIT 1", 
+    "SELECT artist_id AS id, name FROM artists WHERE name LIKE ? OR name_norm LIKE ? LIMIT 1",
     [`%${trimmed}%`, `%${searchNorm}%`]
   );
-  
+
   return likeRows[0] || null;
 }
 
@@ -821,7 +914,7 @@ export async function getMyFollows(followerId) {
 export async function getRecommendations(myEmail) {
   const [users] = await pool.query(
     "SELECT user_id AS userId, nickname, email FROM users WHERE email != ? ORDER BY created_at DESC LIMIT 5",
-    [myEmail || '']
+    [myEmail || ""]
   );
   const [artists] = await pool.query(
     "SELECT artist_id AS artistId, name FROM artists ORDER BY created_at DESC LIMIT 5"
@@ -877,7 +970,8 @@ export async function addPlayHistory(userId, songId) {
 
 // 내 재생 기록 조회 (최신순 20개)
 export async function getMyPlayHistory(userId) {
-  const [rows] = await pool.query(`
+  const [rows] = await pool.query(
+    `
     SELECT 
       h.played_at, 
       s.title, 
@@ -889,7 +983,9 @@ export async function getMyPlayHistory(userId) {
     WHERE h.user_id = ?
     ORDER BY h.played_at DESC
     LIMIT 20
-  `, [userId]);
+  `,
+    [userId]
+  );
   return rows;
 }
 
@@ -912,4 +1008,75 @@ export async function getUsers() {
     `
   );
   return rows;
+}
+
+// PATCH /users/:id
+export async function updateUser(userId, { nickname }) {
+  const trimmed = nickname ? nickname.trim() : null;
+
+  const [result] = await pool.query(
+    `
+    UPDATE ${USERS_TABLE}
+    SET nickname = ?
+    WHERE ${USER_ID_COL} = ?
+    `,
+    [trimmed, userId]
+  );
+
+  if (result.affectedRows === 0) {
+    throw new Error("User not found");
+  }
+
+  // 업데이트된 사용자 정보 반환
+  const [rows] = await pool.query(
+    `
+    SELECT
+      ${USER_ID_COL}   AS id,
+      email,
+      nickname,
+      created_at    AS createdAt,
+      last_login_at AS lastLoginAt
+    FROM ${USERS_TABLE}
+    WHERE ${USER_ID_COL} = ?
+    `,
+    [userId]
+  );
+
+  return rows[0];
+}
+
+// PATCH /users/:id/password - 비밀번호 변경
+export async function updateUserPassword(userId, { newPasswordHash }) {
+  const [result] = await pool.query(
+    `
+    UPDATE ${USERS_TABLE}
+    SET password_hash = ?
+    WHERE ${USER_ID_COL} = ?
+    `,
+    [newPasswordHash, userId]
+  );
+
+  if (result.affectedRows === 0) {
+    throw new Error("User not found");
+  }
+
+  return { id: userId, message: "비밀번호가 변경되었습니다." };
+}
+
+// GET password_hash 조회 (비밀번호 확인용)
+export async function getUserPasswordHash(userId) {
+  const [rows] = await pool.query(
+    `
+    SELECT password_hash
+    FROM ${USERS_TABLE}
+    WHERE ${USER_ID_COL} = ?
+    `,
+    [userId]
+  );
+
+  if (rows.length === 0) {
+    throw new Error("User not found");
+  }
+
+  return rows[0].password_hash;
 }
