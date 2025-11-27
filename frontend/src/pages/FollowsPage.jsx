@@ -156,9 +156,9 @@ export default function FollowsPage() {
                 const ownerId = item.owner_id; 
 
                 // 뱃지 색상 설정 (플레이리스트는 파란색 계열로 추가)
-                let badgeColor = "#7950f2"; // 기본(artist) 보라색
-                if (type === "user") badgeColor = "#20c997"; // user 초록색
-                if (type === "playlist") badgeColor = "#4c6ef5"; // playlist 파란색
+                let badgeColor = "#7950f2"; 
+                if (type === "user") badgeColor = "#20c997"; 
+                if (type === "playlist") badgeColor = "#4c6ef5"; 
 
                 const displayName = name ? name : `ID: ${id}`;
 

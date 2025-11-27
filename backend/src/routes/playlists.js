@@ -79,15 +79,13 @@ router.get("/public", authMiddleware, async (req, res, next) => {
   try {
     const q = (req.query.q || "").toString();
     const sort = (req.query.sort || "").toString();
-    const viewerId = req.user.userId; // 🔹 내 ID 가져오기
+    const viewerId = req.user.userId; 
 
     if (sort === "followers") {
-      // 🔹 viewerId 전달
       const results = await getPopularPublicPlaylists({ limit: 50, viewerId });
       return res.json(results);
     }
 
-    // 🔹 viewerId 전달
     const results = await searchPublicPlaylists({ q, viewerId });
     res.json(results);
   } catch (err) {
@@ -95,13 +93,11 @@ router.get("/public", authMiddleware, async (req, res, next) => {
   }
 });
 
-// 🔽 [신규] 플레이리스트 팔로우 토글
 router.post("/:id/follow", authMiddleware, async (req, res, next) => {
   try {
     const myId = req.user.userId;
     const playlistId = Number(req.params.id);
     
-    // 이미 팔로우 중인지 확인
     const isFollowing = await checkFollow(myId, playlistId, 'playlist');
 
     if (isFollowing) {
@@ -116,7 +112,6 @@ router.post("/:id/follow", authMiddleware, async (req, res, next) => {
   }
 });
 
-// 🔽 [신규] 내가 이 플레이리스트를 팔로우했는지 확인
 router.get("/:id/follow", authMiddleware, async (req, res, next) => {
   try {
     const myId = req.user.userId;
@@ -201,7 +196,6 @@ router.post("/:id/items", authMiddleware, async (req, res, next) => {
 
     res.status(201).json(item);
   } catch (err) {
-    // 이미 들어있는 곡이면 400으로
     if (
       String(err.message).includes(
         "이미 이 플레이리스트에 있는 곡입니다."
@@ -234,7 +228,6 @@ router.delete(
   }
 );
 
-// GET /playlists/public/search (기존 코드 유지)
 router.get("/public/search", async (req, res, next) => {
   try {
     const q = req.query.q || "";
@@ -245,7 +238,6 @@ router.get("/public/search", async (req, res, next) => {
   }
 });
 
-// GET /playlists/public/popular (기존 코드 유지)
 router.get("/public/popular", async (req, res, next) => {
   try {
     const rows = await getPopularPublicPlaylists();
