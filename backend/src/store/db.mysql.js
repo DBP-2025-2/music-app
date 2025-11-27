@@ -1139,3 +1139,11 @@ export async function getPublicPlaylistsByUserId(userId, viewerId) { // 🔹 vie
   );
   return rows;
 }
+
+export async function getPlaylistOwnerId(playlistId) {
+  const [rows] = await pool.query(
+    `SELECT ${PLAYLIST_USER_ID_COL} AS userId FROM ${PLAYLISTS_TABLE} WHERE ${PLAYLIST_ID_COL} = ?`,
+    [playlistId]
+  );
+  return rows[0]?.userId || null;
+}

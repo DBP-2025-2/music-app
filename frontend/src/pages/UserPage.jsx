@@ -9,7 +9,17 @@ export default function UserPage() {
   
   const [playlists, setPlaylists] = useState([]);
   const [loading, setLoading] = useState(true);
+  const myId = (() => {
+    const token = localStorage.getItem("authToken");
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.userId;
+    } catch { return null; }
+  })();
 
+  // 🔹 [추가] 이 페이지가 내 페이지인지 확인
+  const isMe = myId === Number(userId);
   const [expandedId, setExpandedId] = useState(null);
   const [items, setItems] = useState([]);
   const [itemsLoading, setItemsLoading] = useState(false);
@@ -110,6 +120,7 @@ export default function UserPage() {
                 </small>
               </div>
               
+              {!isMe &&(
               <button 
                 className="btn"
                 style={{ 
@@ -126,6 +137,8 @@ export default function UserPage() {
               >
                 {pl.isFollowed ? "💔 언팔로우" : "❤️ 팔로우"}
               </button>
+              )}
+
             </div>
 
             {expandedId === pl.id && (

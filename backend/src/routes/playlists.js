@@ -13,7 +13,8 @@ import {
   getPublicPlaylistsByUserId,
   checkFollow,
   createFollow,
-  deleteFollow
+  deleteFollow,
+  getPlaylistOwnerId
 } from "../store/db.mysql.js";
 import { authMiddleware } from "./auth.js";
 
@@ -97,6 +98,11 @@ router.post("/:id/follow", authMiddleware, async (req, res, next) => {
   try {
     const myId = req.user.userId;
     const playlistId = Number(req.params.id);
+    
+    const ownerId = await getPlaylistOwnerId(playlistId);
+    if (ownerId === myId) {
+      return res.status(400).json({ message: "자신의 플레이리스트는 팔로우할 수 없습니다." });
+    }
     
     const isFollowing = await checkFollow(myId, playlistId, 'playlist');
 
