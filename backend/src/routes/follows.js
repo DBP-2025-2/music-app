@@ -8,12 +8,12 @@ import {
   createFollow, 
   deleteFollow, 
   getRecommendations,
+  searchFollowTargets,
   findUserByEmail
 } from "../store/db.mysql.js";
 
 const router = Router();
 
-// 2. 모든 라우터에 authMiddleware 적용
 // 1) 내 팔로우 목록 조회
 router.get("/list", authMiddleware, async (req, res, next) => {
   try {
@@ -71,7 +71,6 @@ router.delete("/", authMiddleware, async (req, res, next) => {
   try {
     const success = await deleteFollow(myId, following_id, target_type);
     
-    // 이미 삭제되었거나 없는 경우도 그냥 성공으로 처리하거나 404
     if (!success) return res.status(404).json({ message: "팔로우 내역이 없습니다." });
 
     res.json({ message: "언팔로우 완료" });
@@ -86,6 +85,18 @@ router.get("/recommendations", authMiddleware, async (req, res, next) => {
     const myEmail = req.user.email;
     const data = await getRecommendations(myEmail);
     res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/search", authMiddleware, async (req, res, next) => {
+  try {
+    const q = req.query.q;
+    if (!q || q.trim().length < 1) return res.json([]);
+    
+    const results = await searchFollowTargets(q);
+    res.json(results);
   } catch (err) {
     next(err);
   }

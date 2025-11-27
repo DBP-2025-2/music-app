@@ -918,6 +918,31 @@ export async function getRecommendations(myEmail) {
   return { users, artists };
 }
 
+// [backend/src/store/db.mysql.js] 맨 아래에 추가
+
+// 🔍 팔로우 대상 검색 (유저+아티스트)
+export async function searchFollowTargets(keyword) {
+  const like = `%${keyword}%`;
+  
+  const [users] = await pool.query(
+    `SELECT user_id as id, nickname as name, 'user' as type 
+     FROM users 
+     WHERE nickname LIKE ? 
+     LIMIT 5`,
+    [like]
+  );
+
+  const [artists] = await pool.query(
+    `SELECT artist_id as id, name, 'artist' as type 
+     FROM artists 
+     WHERE name LIKE ? 
+     LIMIT 5`,
+    [like]
+  );
+
+  return [...users, ...artists];
+}
+
 // --------------------------------------------------------------------
 // Play History (READ-ONLY)
 // --------------------------------------------------------------------

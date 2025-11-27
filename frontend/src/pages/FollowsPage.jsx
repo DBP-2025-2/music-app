@@ -13,13 +13,15 @@ export default function FollowsPage() {
 
   const [targetType, setTargetType] = useState("user");
   const [targetInput, setTargetInput] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   // 데이터 불러오기
   async function loadData() {
     try {
       setLoading(true);
       setError(null);
-      
+
       const [listData, recData] = await Promise.all([
         fetchJson(`${API}/follows/list`),
         fetchJson(`${API}/follows/recommendations`),
@@ -89,6 +91,31 @@ export default function FollowsPage() {
     }
   }
 
+  async function handleInputChange(e) {
+    const value = e.target.value;
+    setTargetInput(value);
+
+    if (value.trim().length < 1) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    try {
+      const results = await fetchJson(`${API}/follows/search?q=${encodeURIComponent(value)}`);
+      setSearchResults(results);
+      setShowDropdown(true);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  const selectSearchResult = (item) => {
+    setTargetInput(item.name);
+    setTargetType(item.type);
+    setShowDropdown(false);
+  };
+
   // 추천 클릭
   const handleRecommendClick = (type, name) => {
     setTargetType(type);
@@ -102,10 +129,10 @@ export default function FollowsPage() {
       </h1>
 
       <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-        
+
         {/* 왼쪽: 기능 */}
         <div style={{ flex: 2, minWidth: "300px" }}>
-          
+
           {/* 추가 폼 */}
           <section className="card" style={styles.card}>
             <div style={styles.header}>
@@ -120,13 +147,34 @@ export default function FollowsPage() {
                 <option value="user">유저</option>
                 <option value="artist">아티스트</option>
               </select>
-              <input
-                type="text"
-                value={targetInput}
-                onChange={(e) => setTargetInput(e.target.value)}
-                placeholder={targetType === "user" ? "닉네임 입력" : "아티스트 이름 입력"}
-                style={{ ...styles.input, flex: 1 }}
-              />
+              <div style={{ flex: 1, position: "relative" }}>
+                <input
+                  type="text"
+                  value={targetInput}
+                  onChange={handleInputChange} // 🔹 [수정됨]
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 200)} // 🔹 [추가됨]
+                  placeholder="이름을 입력하세요"
+                  style={{ ...styles.input, width: "100%", boxSizing: "border-box" }}
+                />
+
+                {/* 🔹 [완전 새로 추가됨] */}
+                {showDropdown && searchResults.length > 0 && (
+                  <ul style={styles.dropdown}>
+                    {searchResults.map((item, idx) => (
+                      <li
+                        key={idx}
+                        style={styles.dropdownItem}
+                        onMouseDown={() => selectSearchResult(item)}
+                      >
+                        <span style={{ fontWeight: "bold" }}>{item.name}</span>
+                        <span style={{ fontSize: "0.8rem", color: "#888", marginLeft: "5px" }}>
+                          ({item.type})
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <button onClick={handleFollow} style={styles.btnPrimary}>추가</button>
             </div>
           </section>
@@ -146,34 +194,34 @@ export default function FollowsPage() {
             )}
 
             <ul style={{ listStyle: "none", padding: 0 }}>
-                {rows.map((item, idx) => {
+              {rows.map((item, idx) => {
                 const type = item.targetType || item.target_type || "user";
                 const id = item.followingId || item.following_id || item.id;
                 const name = item.targetName || item.target_name || item.name || item.nickname;
                 const createdDate = item.createdAt || item.created_at || "";
-                
+
                 // 🔹 백엔드에서 받아온 playlist 작성자 ID
-                const ownerId = item.owner_id; 
+                const ownerId = item.owner_id;
 
                 // 뱃지 색상 설정 (플레이리스트는 파란색 계열로 추가)
-                let badgeColor = "#7950f2"; 
-                if (type === "user") badgeColor = "#20c997"; 
-                if (type === "playlist") badgeColor = "#4c6ef5"; 
+                let badgeColor = "#7950f2";
+                if (type === "user") badgeColor = "#20c997";
+                if (type === "playlist") badgeColor = "#4c6ef5";
 
                 const displayName = name ? name : `ID: ${id}`;
 
                 return (
-                  <li 
-                    key={idx} 
-                    style={{...styles.listItem, cursor: "pointer"}} 
+                  <li
+                    key={idx}
+                    style={{ ...styles.listItem, cursor: "pointer" }}
                     onClick={() => {
-                        // 🔹 클릭 시 이동 로직 강화
-                        if (type === 'user') navigate(`/user/${id}`);
-                        else if (type === 'artist') navigate(`/artist/${id}`);
-                        else if (type === 'playlist' && ownerId) {
-                           // 플레이리스트를 누르면 작성자의 유저 페이지로 이동
-                           navigate(`/user/${ownerId}`);
-                        }
+                      // 🔹 클릭 시 이동 로직 강화
+                      if (type === 'user') navigate(`/user/${id}`);
+                      else if (type === 'artist') navigate(`/artist/${id}`);
+                      else if (type === 'playlist' && ownerId) {
+                        // 플레이리스트를 누르면 작성자의 유저 페이지로 이동
+                        navigate(`/user/${ownerId}`);
+                      }
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center" }}>
@@ -187,15 +235,15 @@ export default function FollowsPage() {
                         </span>
                         {/* 플레이리스트인 경우 추가 설명 */}
                         {type === 'playlist' && (
-                           <span style={{ fontSize: "0.75rem", color: "#888", marginLeft: "5px" }}>
-                             (작성자 페이지로 이동)
-                           </span>
+                          <span style={{ fontSize: "0.75rem", color: "#888", marginLeft: "5px" }}>
+                            (작성자 페이지로 이동)
+                          </span>
                         )}
                       </div>
                     </div>
                     <button
                       onClick={(e) => {
-                        e.stopPropagation(); 
+                        e.stopPropagation();
                         handleUnfollow(id, type);
                       }}
                       style={styles.btnDanger}
@@ -215,12 +263,12 @@ export default function FollowsPage() {
             <h4 style={{ marginTop: 0, color: "#856404", borderBottom: "1px solid #ffeeba", paddingBottom: "10px" }}>
               💾 추천 목록
             </h4>
-            
+
             <p style={styles.recLabel}>👤 유저</p>
             <ul style={{ listStyle: "none", padding: 0 }}>
               {recommendations.users.map(u => (
                 <li key={u.userId} onClick={() => handleRecommendClick("user", u.nickname)} style={styles.recItem}>
-                  <span>{u.nickname}</span><span style={{color: "#aaa"}}>👉</span>
+                  <span>{u.nickname}</span><span style={{ color: "#aaa" }}>👉</span>
                 </li>
               ))}
             </ul>
@@ -229,7 +277,7 @@ export default function FollowsPage() {
             <ul style={{ listStyle: "none", padding: 0 }}>
               {recommendations.artists.map(a => (
                 <li key={a.artistId} onClick={() => handleRecommendClick("artist", a.name)} style={styles.recItem}>
-                  <span>{a.name}</span><span style={{color: "#aaa"}}>👉</span>
+                  <span>{a.name}</span><span style={{ color: "#aaa" }}>👉</span>
                 </li>
               ))}
             </ul>
@@ -252,5 +300,28 @@ const styles = {
   listItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 5px", borderBottom: "1px solid #f1f1f1" },
   badge: { color: "white", padding: "4px 8px", borderRadius: "20px", fontSize: "0.7rem", fontWeight: "bold", marginRight: "10px", textTransform: "uppercase", minWidth: "50px", textAlign: "center" },
   recLabel: { margin: "15px 0 5px", fontWeight: "bold", color: "#666", fontSize: "0.9rem" },
-  recItem: { padding: "8px", background: "white", marginBottom: "5px", borderRadius: "4px", cursor: "pointer", border: "1px solid #e0e0e0", display: "flex", justifyContent: "space-between" }
+
+  // 👇 여기 끝에 콤마(,)를 꼭 찍어야 합니다!
+  recItem: { padding: "8px", background: "white", marginBottom: "5px", borderRadius: "4px", cursor: "pointer", border: "1px solid #e0e0e0", display: "flex", justifyContent: "space-between" },
+
+  // 🔹 [추가] 드롭다운 스타일
+  dropdown: {
+    position: "absolute",
+    top: "100%", left: 0, right: 0,
+    backgroundColor: "white",
+    border: "1px solid #ddd",
+    borderRadius: "0 0 5px 5px",
+    maxHeight: "200px",
+    overflowY: "auto",
+    listStyle: "none",
+    padding: 0, margin: 0,
+    zIndex: 10,
+    boxShadow: "0 4px 6px rgba(0,0,0,0.1)"
+  },
+  dropdownItem: {
+    padding: "10px",
+    cursor: "pointer",
+    borderBottom: "1px solid #eee",
+    display: "flex", justifyContent: "space-between", alignItems: "center"
+  }
 };
