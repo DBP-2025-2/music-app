@@ -1,4 +1,3 @@
-// backend/src/routes/playlists.js
 import { Router } from "express";
 import {
   getPlaylists,
@@ -9,7 +8,12 @@ import {
   addPlaylistItem,
   deletePlaylistItem,
   searchPublicPlaylists,
-  getPopularPublicPlaylists,   
+  getPopularPublicPlaylists,
+  // 🔽 [추가] 새로 필요한 DB 함수들을 임포트합니다.
+  getPublicPlaylistsByUserId,
+  checkFollow,
+  createFollow,
+  deleteFollow
 } from "../store/db.mysql.js";
 import { authMiddleware } from "./auth.js";
 
@@ -21,8 +25,22 @@ const router = Router();
  */
 router.get("/", authMiddleware, async (req, res, next) => {
   try {
-    const userId = req.user.userId;           // 🔥 토큰에서 userId
+    const userId = req.user.userId;
     const playlists = await getPlaylists(userId);
+    res.json(playlists);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 🔽 [신규] 특정 유저의 공개 플레이리스트 목록 (UserPage용)
+router.get("/user/:userId", authMiddleware, async (req, res, next) => {
+  try {
+    const userId = Number(req.params.userId);
+    const viewerId = req.user.userId; // 🔹 토큰에서 내 ID 가져오기
+    
+    // DB 함수에 viewerId도 전달
+    const playlists = await getPublicPlaylistsByUserId(userId, viewerId);
     res.json(playlists);
   } catch (err) {
     next(err);
@@ -76,6 +94,38 @@ router.get("/public", async (req, res, next) => {
   }
 });
 
+// 🔽 [신규] 플레이리스트 팔로우 토글
+router.post("/:id/follow", authMiddleware, async (req, res, next) => {
+  try {
+    const myId = req.user.userId;
+    const playlistId = Number(req.params.id);
+    
+    // 이미 팔로우 중인지 확인
+    const isFollowing = await checkFollow(myId, playlistId, 'playlist');
+
+    if (isFollowing) {
+      await deleteFollow(myId, playlistId, 'playlist');
+      return res.json({ followed: false });
+    } else {
+      await createFollow(myId, playlistId, 'playlist');
+      return res.json({ followed: true });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 🔽 [신규] 내가 이 플레이리스트를 팔로우했는지 확인
+router.get("/:id/follow", authMiddleware, async (req, res, next) => {
+  try {
+    const myId = req.user.userId;
+    const playlistId = Number(req.params.id);
+    const isFollowing = await checkFollow(myId, playlistId, 'playlist');
+    res.json({ followed: isFollowing });
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * PATCH /playlists/:id
@@ -182,7 +232,8 @@ router.delete(
     }
   }
 );
-// GET /playlists/public/search?q=...
+
+// GET /playlists/public/search (기존 코드 유지)
 router.get("/public/search", async (req, res, next) => {
   try {
     const q = req.query.q || "";
@@ -193,7 +244,7 @@ router.get("/public/search", async (req, res, next) => {
   }
 });
 
-// GET /playlists/public/popular
+// GET /playlists/public/popular (기존 코드 유지)
 router.get("/public/popular", async (req, res, next) => {
   try {
     const rows = await getPopularPublicPlaylists();

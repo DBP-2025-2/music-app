@@ -5,19 +5,17 @@ import dotenv from "dotenv";
 dotenv.config();
 
 /**
- *
- *
  * tables:
- *  - artists(artist_id, name, name_norm, created_at)
- *  - albums(album_id, title, title_norm, artist_main_id, created_at)
- *  - songs(song_id, title, title_norm, album_id, is_collab, play_count, created_at)
- *  - song_artists(song_id, artist_id, display_order, created_at)
- *  - playlists(playlist_id, user_id, name, is_public, created_at, updated_at)
- *  - playlist_items(item_id, playlist_id, song_id, position, note, added_at)
- *  - charts(chart_id, chart_type, year, week, rank, song_id, week_start_date, week_end_date)
- *  - follows(follower_id, following_id, target_type, created_at)
- *  - play_history(history_id, user_id, song_id, played_at)
- *  - users(user_id, email, password_hash, nickname, created_at, last_login_at)
+ * - artists(artist_id, name, name_norm, created_at)
+ * - albums(album_id, title, title_norm, artist_main_id, created_at)
+ * - songs(song_id, title, title_norm, album_id, is_collab, play_count, created_at)
+ * - song_artists(song_id, artist_id, display_order, created_at)
+ * - playlists(playlist_id, user_id, name, is_public, created_at, updated_at)
+ * - playlist_items(item_id, playlist_id, song_id, position, note, added_at)
+ * - charts(chart_id, chart_type, year, week, rank, song_id, week_start_date, week_end_date)
+ * - follows(follower_id, following_id, target_type, created_at)
+ * - play_history(history_id, user_id, song_id, played_at)
+ * - users(user_id, email, password_hash, nickname, created_at, last_login_at)
  */
 
 // === Artists ===
@@ -406,6 +404,7 @@ export async function deleteSong(id) {
 // Playlists
 // --------------------------------------------------------------------
 
+
 // GET /playlists  → 내 플레이리스트
 export async function getPlaylists(userId) {
   const [rows] = await pool.query(
@@ -425,12 +424,7 @@ export async function getPlaylists(userId) {
 }
 
 // POST /playlists
-export async function createPlaylist({
-  userId,
-  name,
-  isPublic = true,
-  note = "",
-}) {
+export async function createPlaylist({ userId, name, isPublic = true, note = "" }) {
   const [result] = await pool.query(
     `
     INSERT INTO ${PLAYLISTS_TABLE}
@@ -493,6 +487,7 @@ export async function searchSongs({ q }) {
 
   return rows;
 }
+
 
 export async function searchPublicPlaylists({ q }) {
   const params = [];
@@ -583,6 +578,8 @@ export async function getPopularPublicPlaylists({ limit = 50 } = {}) {
   return rows;
 }
 
+
+
 // DELETE /playlists/:id
 export async function deletePlaylist(id) {
   const conn = await pool.getConnection();
@@ -655,6 +652,8 @@ export async function getPlaylistItems(playlistId) {
 
   return rows;
 }
+
+
 
 // POST /playlists/:id/items
 export async function addPlaylistItem({ playlistId, songId }) {
@@ -899,10 +898,19 @@ export async function getMyFollows(followerId) {
       CASE 
         WHEN f.target_type = 'user' THEN u.nickname 
         WHEN f.target_type = 'artist' THEN a.name 
-      END AS target_name
+        WHEN f.target_type = 'playlist' THEN p.name  -- 🔹 추가됨
+      END AS target_name,
+      
+      -- 🔹 플레이리스트일 경우 작성자(owner) ID가 필요함 (클릭 시 이동 위해)
+      CASE
+        WHEN f.target_type = 'playlist' THEN p.user_id
+        ELSE NULL
+      END AS owner_id
+
     FROM follows f
     LEFT JOIN users u ON f.following_id = u.user_id AND f.target_type = 'user'
     LEFT JOIN artists a ON f.following_id = a.artist_id AND f.target_type = 'artist'
+    LEFT JOIN playlists p ON f.following_id = p.playlist_id AND f.target_type = 'playlist' -- 🔹 추가됨
     WHERE f.follower_id = ?
     ORDER BY f.created_at DESC
   `;
@@ -1010,7 +1018,7 @@ export async function getUsers() {
   return rows;
 }
 
-// PATCH /users/:id
+// PATCH /users/:id - 닉네임 변경
 export async function updateUser(userId, { nickname }) {
   const trimmed = nickname ? nickname.trim() : null;
 
@@ -1079,4 +1087,51 @@ export async function getUserPasswordHash(userId) {
   }
 
   return rows[0].password_hash;
+}
+
+// === 플레이리스트 팔로우 여부 체크 ===
+export async function checkFollow(followerId, followingId, targetType) {
+  const [rows] = await pool.query(
+    "SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ? AND target_type = ?",
+    [followerId, followingId, targetType]
+  );
+  return rows.length > 0;
+}
+
+// === 특정 유저의 공개 플레이리스트 조회 (UserPage용) ===
+export async function getPublicPlaylistsByUserId(userId, viewerId) { // 🔹 viewerId 추가됨
+  const [rows] = await pool.query(
+    `
+    SELECT
+      p.${PLAYLIST_ID_COL}      AS id,
+      p.${PLAYLIST_NAME_COL}    AS name,
+      p.note                    AS note,
+      u.nickname                AS ownerNickname,
+      COUNT(DISTINCT pi.${ITEM_ID_COL}) AS trackCount,
+      COALESCE(f.followers, 0)  AS followerCount,
+      
+      -- 🔹 [추가] 내가 팔로우했는지 여부 (1이면 true, 0이면 false)
+      MAX(CASE WHEN my_f.follower_id IS NOT NULL THEN 1 ELSE 0 END) AS isFollowed
+
+    FROM ${PLAYLISTS_TABLE} p
+    JOIN ${USERS_TABLE} u ON u.${USER_ID_COL} = p.${PLAYLIST_USER_ID_COL}
+    LEFT JOIN ${PLAYLIST_ITEMS_TABLE} pi ON pi.${ITEM_PLAYLIST_ID_COL} = p.${PLAYLIST_ID_COL}
+    LEFT JOIN (
+      SELECT following_id, COUNT(*) as followers
+      FROM follows WHERE target_type = 'playlist' GROUP BY following_id
+    ) f ON f.following_id = p.${PLAYLIST_ID_COL}
+    
+    -- 🔹 [추가] 내 팔로우 정보 확인용 조인
+    LEFT JOIN follows my_f 
+      ON my_f.following_id = p.${PLAYLIST_ID_COL} 
+      AND my_f.follower_id = ? 
+      AND my_f.target_type = 'playlist'
+
+    WHERE p.${PLAYLIST_USER_ID_COL} = ? AND p.${PLAYLIST_IS_PUBLIC_COL} = 1
+    GROUP BY p.${PLAYLIST_ID_COL}
+    ORDER BY p.${PLAYLIST_ID_COL} DESC
+    `,
+    [viewerId, userId] // 🔹 파라미터 순서 주의 (보는사람ID, 주인ID)
+  );
+  return rows;
 }

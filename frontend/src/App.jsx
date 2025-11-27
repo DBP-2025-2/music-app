@@ -13,6 +13,8 @@ import UsersPage from "./pages/UsersPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ChartsYearPage from "./pages/ChartsYearPage";
+import UserPage from "./pages/UserPage";
+import ArtistPage from "./pages/ArtistPage"; // 👈 [중요] 이 줄이 빠져 있었습니다!
 
 /* ---------- 공통 레이아웃 ---------- */
 
@@ -25,74 +27,17 @@ function Layout({ children, isLoggedIn, onLogout }) {
           <span>Music App</span>
         </div>
         <nav className="app-nav">
-          <NavLink
-            to="/artists"
-            className={({ isActive }) =>
-              "nav-link" + (isActive ? " nav-link--active" : "")
-            }
-          >
-            Artists
-          </NavLink>
-          <NavLink
-            to="/songs"
-            className={({ isActive }) =>
-              "nav-link" + (isActive ? " nav-link--active" : "")
-            }
-          >
-            Songs
-          </NavLink>
-          <NavLink
-            to="/albums"
-            className={({ isActive }) =>
-              "nav-link" + (isActive ? " nav-link--active" : "")
-            }
-          >
-            Albums
-          </NavLink>
-          <NavLink
-            to="/playlists"
-            className={({ isActive }) =>
-              "nav-link" + (isActive ? " nav-link--active" : "")
-            }
-          >
-            Playlists
-          </NavLink>
-          <NavLink
-            to="/charts"
-            className={({ isActive }) =>
-              "nav-link" + (isActive ? " nav-link--active" : "")
-            }
-          >
-            Charts
-          </NavLink>
-          <NavLink
-            to="/follows"
-            className={({ isActive }) =>
-              "nav-link" + (isActive ? " nav-link--active" : "")
-            }
-          >
-            Follows
-          </NavLink>
-          <NavLink
-            to="/history"
-            className={({ isActive }) =>
-              "nav-link" + (isActive ? " nav-link--active" : "")
-            }
-          >
-            History
-          </NavLink>
-          <NavLink
-            to="/users"
-            className={({ isActive }) =>
-              "nav-link" + (isActive ? " nav-link--active" : "")
-            }
-          >
-            Users
-          </NavLink>
+          <NavLink to="/artists" className={({ isActive }) => "nav-link" + (isActive ? " nav-link--active" : "")}>Artists</NavLink>
+          <NavLink to="/songs" className={({ isActive }) => "nav-link" + (isActive ? " nav-link--active" : "")}>Songs</NavLink>
+          <NavLink to="/albums" className={({ isActive }) => "nav-link" + (isActive ? " nav-link--active" : "")}>Albums</NavLink>
+          <NavLink to="/playlists" className={({ isActive }) => "nav-link" + (isActive ? " nav-link--active" : "")}>Playlists</NavLink>
+          <NavLink to="/charts" className={({ isActive }) => "nav-link" + (isActive ? " nav-link--active" : "")}>Charts</NavLink>
+          <NavLink to="/follows" className={({ isActive }) => "nav-link" + (isActive ? " nav-link--active" : "")}>Follows</NavLink>
+          <NavLink to="/history" className={({ isActive }) => "nav-link" + (isActive ? " nav-link--active" : "")}>History</NavLink>
+          <NavLink to="/users" className={({ isActive }) => "nav-link" + (isActive ? " nav-link--active" : "")}>Users</NavLink>
+          
           {isLoggedIn && (
-            <button className="nav-link logout-btn" onClick={onLogout}>
-              🚪 로그아웃
-            </button>
+            <button className="nav-link logout-btn" onClick={onLogout}>🚪 로그아웃</button>
           )}
         </nav>
       </header>
@@ -108,7 +53,6 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    // 페이지 로드 시 토큰 확인
     const token = localStorage.getItem("authToken");
     setIsLoggedIn(!!token);
   }, []);
@@ -136,25 +80,19 @@ export default function App() {
             <Route path="/follows" element={<FollowsPage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/users" element={<UsersPage />} />
-            <Route path="/charts" element={<ChartsPage />} />
+            
+            {/* 상세 페이지 라우트 */}
             <Route path="/charts/year/:year" element={<ChartsYearPage />} />
+            <Route path="/user/:userId" element={<UserPage />} />
+            <Route path="/artist/:artistId" element={<ArtistPage />} />
           </Routes>
         </Layout>
       ) : (
         <Routes>
-          <Route
-            path="/"
-            element={<HomePage onLoginSuccess={handleLoginSuccess} />}
-          />
-          <Route
-            path="/login"
-            element={<LoginPage onLoginSuccess={handleLoginSuccess} />}
-          />
+          <Route path="/" element={<HomePage onLoginSuccess={handleLoginSuccess} />} />
+          <Route path="/login" element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route
-            path="*"
-            element={<HomePage onLoginSuccess={handleLoginSuccess} />}
-          />
+          <Route path="*" element={<HomePage onLoginSuccess={handleLoginSuccess} />} />
         </Routes>
       )}
     </BrowserRouter>
