@@ -489,7 +489,7 @@ export async function searchSongs({ q }) {
 }
 
 
-export async function searchPublicPlaylists({ q }) {
+export async function searchPublicPlaylists({ q, viewerId }) { // 🔹 viewerId 추가
   const params = [];
   let where = `WHERE p.${PLAYLIST_IS_PUBLIC_COL} = 1`;
 
@@ -499,6 +499,9 @@ export async function searchPublicPlaylists({ q }) {
     params.push(like, like);
   }
 
+  // 🔹 viewerId 파라미터 추가
+  params.push(viewerId);
+
   const [rows] = await pool.query(
     `
     SELECT
@@ -507,28 +510,29 @@ export async function searchPublicPlaylists({ q }) {
       p.note                    AS note,
       u.nickname                AS ownerNickname,
       COUNT(DISTINCT pi.${ITEM_ID_COL}) AS trackCount,
-      COALESCE(f.followers, 0)  AS followerCount
+      COALESCE(f.followers, 0)  AS followerCount,
+      
+      -- 🔹 [추가] 내 팔로우 여부 확인
+      MAX(CASE WHEN my_f.follower_id IS NOT NULL THEN 1 ELSE 0 END) AS isFollowed
+
     FROM ${PLAYLISTS_TABLE} p
-    JOIN ${USERS_TABLE} u
-      ON u.${USER_ID_COL} = p.${PLAYLIST_USER_ID_COL}
-    LEFT JOIN ${PLAYLIST_ITEMS_TABLE} pi
-      ON pi.${ITEM_PLAYLIST_ID_COL} = p.${PLAYLIST_ID_COL}
+    JOIN ${USERS_TABLE} u ON u.${USER_ID_COL} = p.${PLAYLIST_USER_ID_COL}
+    LEFT JOIN ${PLAYLIST_ITEMS_TABLE} pi ON pi.${ITEM_PLAYLIST_ID_COL} = p.${PLAYLIST_ID_COL}
+    
+    -- 전체 팔로워 수 집계
     LEFT JOIN (
-      SELECT
-        following_id,
-        COUNT(DISTINCT follower_id) AS followers
-      FROM ${FOLLOWS_TABLE}
-      WHERE target_type = 'playlist'
-      GROUP BY following_id
-    ) f
-      ON f.following_id = p.${PLAYLIST_ID_COL}
+      SELECT following_id, COUNT(*) as followers
+      FROM ${FOLLOWS_TABLE} WHERE target_type = 'playlist' GROUP BY following_id
+    ) f ON f.following_id = p.${PLAYLIST_ID_COL}
+
+    -- 🔹 [추가] 내 팔로우 정보 조인
+    LEFT JOIN ${FOLLOWS_TABLE} my_f 
+      ON my_f.following_id = p.${PLAYLIST_ID_COL} 
+      AND my_f.target_type = 'playlist'
+      AND my_f.follower_id = ?
+
     ${where}
-    GROUP BY
-      p.${PLAYLIST_ID_COL},
-      p.${PLAYLIST_NAME_COL},
-      p.note,
-      u.nickname,
-      f.followers
+    GROUP BY p.${PLAYLIST_ID_COL}
     ORDER BY p.${PLAYLIST_ID_COL} DESC
     `,
     params
@@ -538,7 +542,7 @@ export async function searchPublicPlaylists({ q }) {
 }
 
 // 팔로우 수 기준 상위 공개 플레이리스트
-export async function getPopularPublicPlaylists({ limit = 50 } = {}) {
+export async function getPopularPublicPlaylists({ limit = 50, viewerId } = {}) { // 🔹 viewerId 추가
   const [rows] = await pool.query(
     `
     SELECT
@@ -547,32 +551,32 @@ export async function getPopularPublicPlaylists({ limit = 50 } = {}) {
       p.note                    AS note,
       u.nickname                AS ownerNickname,
       COUNT(DISTINCT pi.${ITEM_ID_COL}) AS trackCount,
-      COALESCE(f.followers, 0)  AS followerCount
+      COALESCE(f.followers, 0)  AS followerCount,
+
+      -- 🔹 [추가] 내 팔로우 여부 확인
+      MAX(CASE WHEN my_f.follower_id IS NOT NULL THEN 1 ELSE 0 END) AS isFollowed
+
     FROM ${PLAYLISTS_TABLE} p
-    JOIN ${USERS_TABLE} u
-      ON u.${USER_ID_COL} = p.${PLAYLIST_USER_ID_COL}
-    LEFT JOIN ${PLAYLIST_ITEMS_TABLE} pi
-      ON pi.${ITEM_PLAYLIST_ID_COL} = p.${PLAYLIST_ID_COL}
+    JOIN ${USERS_TABLE} u ON u.${USER_ID_COL} = p.${PLAYLIST_USER_ID_COL}
+    LEFT JOIN ${PLAYLIST_ITEMS_TABLE} pi ON pi.${ITEM_PLAYLIST_ID_COL} = p.${PLAYLIST_ID_COL}
+    
     LEFT JOIN (
-      SELECT
-        following_id,
-        COUNT(DISTINCT follower_id) AS followers
-      FROM ${FOLLOWS_TABLE}
-      WHERE target_type = 'playlist'
-      GROUP BY following_id
-    ) f
-      ON f.following_id = p.${PLAYLIST_ID_COL}
+      SELECT following_id, COUNT(*) as followers
+      FROM ${FOLLOWS_TABLE} WHERE target_type = 'playlist' GROUP BY following_id
+    ) f ON f.following_id = p.${PLAYLIST_ID_COL}
+
+    -- 🔹 [추가] 내 팔로우 정보 조인
+    LEFT JOIN ${FOLLOWS_TABLE} my_f 
+      ON my_f.following_id = p.${PLAYLIST_ID_COL} 
+      AND my_f.target_type = 'playlist'
+      AND my_f.follower_id = ?
+
     WHERE p.${PLAYLIST_IS_PUBLIC_COL} = 1
-    GROUP BY
-      p.${PLAYLIST_ID_COL},
-      p.${PLAYLIST_NAME_COL},
-      p.note,
-      u.nickname,
-      f.followers
+    GROUP BY p.${PLAYLIST_ID_COL}
     ORDER BY followerCount DESC, p.${PLAYLIST_ID_COL} DESC
     LIMIT ?
     `,
-    [limit]
+    [viewerId, limit] // 🔹 파라미터 순서 주의
   );
 
   return rows;

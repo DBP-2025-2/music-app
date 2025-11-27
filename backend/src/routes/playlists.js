@@ -75,19 +75,20 @@ router.post("/", authMiddleware, async (req, res, next) => {
 
 // GET /playlists/public?q=키워드
 // GET /playlists/public?q=키워드&sort=followers
-router.get("/public", async (req, res, next) => {
+router.get("/public", authMiddleware, async (req, res, next) => {
   try {
     const q = (req.query.q || "").toString();
     const sort = (req.query.sort || "").toString();
+    const viewerId = req.user.userId; // 🔹 내 ID 가져오기
 
     if (sort === "followers") {
-      // 팔로우 수 기준 인기 순
-      const results = await getPopularPublicPlaylists({ limit: 50 });
+      // 🔹 viewerId 전달
+      const results = await getPopularPublicPlaylists({ limit: 50, viewerId });
       return res.json(results);
     }
 
-    // 기본: 검색 + 최신순
-    const results = await searchPublicPlaylists({ q });
+    // 🔹 viewerId 전달
+    const results = await searchPublicPlaylists({ q, viewerId });
     res.json(results);
   } catch (err) {
     next(err);

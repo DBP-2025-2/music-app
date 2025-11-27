@@ -1045,14 +1045,23 @@ export default function PlaylistsPage() {
                       <div className="col-actions">
                             <button
                               className="btn btn-secondary"
-                              style={{ fontSize: "0.85rem", padding: "6px 12px" }}
+                              style={{ 
+                                fontSize: "0.85rem", 
+                                padding: "6px 12px",
+    // 🔹 스타일 조건부 변경 (UserPage와 동일하게)
+                                backgroundColor: pl.isFollowed ? "#ffebeb" : "#f3f4f6", 
+                                color: pl.isFollowed ? "#dc3545" : "#374151", 
+                                border: pl.isFollowed ? "1px solid #dc3545" : "none",
+                                fontWeight: "600"
+                              }}
                               onClick={(e) => {
-                              e.stopPropagation(); // 클릭 시 상세 목록 펼쳐짐 방지
-                              handleFollowPublicPlaylist(pl.id); 
-                            }}
-                          >
-                            ❤️ 팔로우
-                          </button>
+                                e.stopPropagation();
+                                handleFollowPublicPlaylist(pl.id); 
+                              }}
+                            >
+                              {/* 🔹 텍스트 변경 */}
+                              {pl.isFollowed ? "💔 언팔로우" : "❤️ 팔로우"}
+                              </button>
                       </div>
                     </div>
 
