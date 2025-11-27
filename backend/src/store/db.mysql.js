@@ -738,90 +738,24 @@ export async function getCharts() {
 
 // GET /songs/:id/charts - 특정 노래의 차트 기록
 export async function getSongCharts(songId) {
-  console.log(`📊 [getSongCharts] Querying charts for songId: ${songId}`);
-  try {
-    const [rows] = await pool.query(
-      `
-      SELECT
-        chart_id AS id,
-        chart_type AS chartType,
-        year,
-        week,
-        \`rank\` AS \`rank\`,
-        week_start_date AS weekStartDate,
-        week_end_date AS weekEndDate
-      FROM ${CHARTS_TABLE}
-      WHERE song_id = ?
-      ORDER BY year DESC, week DESC
-      `,
-      [songId]
-    );
+  const [rows] = await pool.query(
+    `
+    SELECT
+      chart_id AS id,
+      chart_type AS chartType,
+      year,
+      week,
+      \`rank\` AS rank,
+      week_start_date AS weekStartDate,
+      week_end_date AS weekEndDate
+    FROM ${CHARTS_TABLE}
+    WHERE song_id = ?
+    ORDER BY year DESC, week DESC
+    `,
+    [songId]
+  );
 
-    console.log(`📊 [getSongCharts] Found ${rows.length} records for songId: ${songId}`);
-    return rows;
-  } catch (error) {
-    console.error(`❌ [getSongCharts] Error querying charts:`, error.message);
-    console.error(`❌ SQL Error:`, error);
-    throw error;
-  }
-}
-
-// GET /songs/:id/recommendations - 특정 노래와 같은 차트 기간에 올랐던 곡들 추천
-export async function getRecommendedSongs(songId) {
-  console.log(`🎵 [getRecommendedSongs] Getting recommendations for songId: ${songId}`);
-  try {
-    // 1) 해당 곡이 올랐던 차트 기간들 조회
-    const [chartPeriods] = await pool.query(
-      `
-      SELECT DISTINCT year, week
-      FROM ${CHARTS_TABLE}
-      WHERE song_id = ?
-      LIMIT 5
-      `,
-      [songId]
-    );
-
-    if (chartPeriods.length === 0) {
-      console.log(`🎵 [getRecommendedSongs] No chart records found for songId: ${songId}`);
-      return [];
-    }
-
-    // 2) 같은 차트 기간에 올랐던 다른 곡들 조회
-    const placeholders = chartPeriods.map(() => "(c.year = ? AND c.week = ?)").join(" OR ");
-    const params = [];
-    chartPeriods.forEach((period) => {
-      params.push(period.year, period.week);
-    });
-    params.push(songId); // WHERE song_id != ?
-
-    const [recommendedRows] = await pool.query(
-      `
-      SELECT DISTINCT
-        s.song_id AS id,
-        s.title,
-        a.name AS artistName,
-        COUNT(DISTINCT (c.year * 100 + c.week)) AS chartCount
-      FROM ${CHARTS_TABLE} c
-      JOIN ${SONGS_TABLE} s ON c.song_id = s.song_id
-      LEFT JOIN ${SONG_ARTISTS_TABLE} sa ON s.song_id = sa.song_id
-      LEFT JOIN ${ARTISTS_TABLE} a ON sa.artist_id = a.artist_id
-      WHERE (${placeholders})
-      AND c.song_id != ?
-      GROUP BY s.song_id, s.title, a.name
-      ORDER BY chartCount DESC, s.song_id DESC
-      LIMIT 10
-      `,
-      params
-    );
-
-    console.log(
-      `🎵 [getRecommendedSongs] Found ${recommendedRows.length} recommendations for songId: ${songId}`
-    );
-    return recommendedRows;
-  } catch (error) {
-    console.error(`❌ [getRecommendedSongs] Error:`, error.message);
-    throw error;
-  }
+  return rows;
 }
 
 // --------------------------------------------------------------------

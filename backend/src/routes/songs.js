@@ -8,7 +8,6 @@ import {
   deleteSong,
   searchSongs,
   getSongCharts,
-  getRecommendedSongs,
 } from "../store/db.mysql.js";
 
 const router = Router();
@@ -58,40 +57,6 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-// ⭐ GET /songs/:id/charts - 특정 노래의 차트 기록 (더 구체적인 패턴이므로 먼저 와야 함)
-router.get("/:id/charts", async (req, res, next) => {
-  try {
-    const songId = Number(req.params.id);
-    console.log(`📊 [GET /songs/:id/charts] songId: ${songId}`);
-    if (!songId || songId <= 0) {
-      return res.status(400).json({ error: "invalid song id" });
-    }
-    const charts = await getSongCharts(songId);
-    console.log(`📊 [GET /songs/:id/charts] Found ${charts.length} chart records`);
-    res.json(charts);
-  } catch (err) {
-    console.error("❌ [GET /songs/:id/charts] Error:", err);
-    next(err);
-  }
-});
-
-// ⭐ GET /songs/:id/recommendations - 추천곡
-router.get("/:id/recommendations", async (req, res, next) => {
-  try {
-    const songId = Number(req.params.id);
-    console.log(`🎵 [GET /songs/:id/recommendations] songId: ${songId}`);
-    if (!songId || songId <= 0) {
-      return res.status(400).json({ error: "invalid song id" });
-    }
-    const recommendations = await getRecommendedSongs(songId);
-    console.log(`🎵 [GET /songs/:id/recommendations] Found ${recommendations.length} recommendations`);
-    res.json(recommendations);
-  } catch (err) {
-    console.error("❌ [GET /songs/:id/recommendations] Error:", err);
-    next(err);
-  }
-});
-
 // PATCH /songs/:id
 router.patch("/:id", async (req, res, next) => {
   try {
@@ -105,6 +70,20 @@ router.patch("/:id", async (req, res, next) => {
       artistId: Number(artistId),
     });
     res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /songs/:id/charts - 특정 노래의 차트 기록
+router.get("/:id/charts", async (req, res, next) => {
+  try {
+    const songId = Number(req.params.id);
+    if (!songId) {
+      return res.status(400).json({ error: "invalid song id" });
+    }
+    const charts = await getSongCharts(songId);
+    res.json(charts);
   } catch (err) {
     next(err);
   }
