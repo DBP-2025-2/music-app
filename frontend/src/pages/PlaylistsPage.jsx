@@ -199,6 +199,47 @@ export default function PlaylistsPage() {
     }
   }
 
+  // ─────────────────────────────
+  // 재생 기능
+  // ─────────────────────────────
+  async function handlePlaySong(songId, songTitle) {
+    try {
+      await fetchJson(`${API}/play-history`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ song_id: songId }),
+      });
+      alert(`🎵 '${songTitle}' 재생 시작!`);
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "재생에 실패했습니다.");
+    }
+  }
+
+  // 플레이리스트의 모든 곡 재생
+  async function handlePlayAllSongs() {
+    if (items.length === 0) {
+      alert("플레이리스트에 곡이 없습니다.");
+      return;
+    }
+
+    try {
+      for (const item of items) {
+        await fetchJson(`${API}/play-history`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ song_id: item.songId }),
+        });
+      }
+      alert(
+        `🎵 ${selectedPlaylist.name}의 모든 곡 ${items.length}개를 재생 큐에 추가했습니다!`
+      );
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "재생에 실패했습니다.");
+    }
+  }
+
   function handleSearchKeyDown(e) {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -418,11 +459,10 @@ export default function PlaylistsPage() {
       } else {
         alert("팔로우를 취소했습니다. 💔");
       }
-      
+
       // 목록 갱신 (팔로워 수 업데이트 등을 위해)
       if (publicMode === "search") handleSearchPublic();
       else handleLoadPopularPublic();
-
     } catch (e) {
       console.error(e);
       alert(e.message || "오류가 발생했습니다.");
@@ -712,9 +752,27 @@ export default function PlaylistsPage() {
 
           {/* 오른쪽: 선택된 플리 상세 + 곡 검색/추가 */}
           <div>
-            <h3 style={{ marginBottom: 3 }}>
-              {selectedPlaylist ? selectedPlaylist.name : "(선택 안 됨)"}
-            </h3>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 16,
+              }}
+            >
+              <h3 style={{ margin: 0 }}>
+                {selectedPlaylist ? selectedPlaylist.name : "(선택 안 됨)"}
+              </h3>
+              {selectedPlaylist && items.length > 0 && (
+                <button
+                  className="btn primary"
+                  onClick={handlePlayAllSongs}
+                  style={{ padding: "8px 16px" }}
+                >
+                  ▶️ 전체 재생
+                </button>
+              )}
+            </div>
 
             {!selectedId && (
               <p className="text-muted">
@@ -900,7 +958,7 @@ export default function PlaylistsPage() {
                             <div
                               style={{
                                 position: "absolute",
-                                left: "-100px",
+                                left: "-160px",
                                 top: "-20%",
                                 background: "#fff",
                                 border: "1px solid #e5e7eb",
@@ -911,6 +969,18 @@ export default function PlaylistsPage() {
                                 gap: "6px",
                               }}
                             >
+                              <button
+                                className="btn primary"
+                                onClick={() =>
+                                  handlePlaySong(item.songId, item.songTitle)
+                                }
+                                style={{
+                                  padding: "6px 12px",
+                                  fontSize: "14px",
+                                }}
+                              >
+                                ▶️ 재생
+                              </button>
                               <button
                                 className="btn btn-danger"
                                 onClick={() => handleRemoveItem(item.id)}
@@ -1043,25 +1113,29 @@ export default function PlaylistsPage() {
                       <div className="col-followers">{followerCount}명</div>
 
                       <div className="col-actions">
-                            <button
-                              className="btn btn-secondary"
-                              style={{ 
-                                fontSize: "0.85rem", 
-                                padding: "6px 12px",
-    // 🔹 스타일 조건부 변경 (UserPage와 동일하게)
-                                backgroundColor: pl.isFollowed ? "#ffebeb" : "#f3f4f6", 
-                                color: pl.isFollowed ? "#dc3545" : "#374151", 
-                                border: pl.isFollowed ? "1px solid #dc3545" : "none",
-                                fontWeight: "600"
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleFollowPublicPlaylist(pl.id); 
-                              }}
-                            >
-                              {/* 🔹 텍스트 변경 */}
-                              {pl.isFollowed ? "💔 언팔로우" : "❤️ 팔로우"}
-                              </button>
+                        <button
+                          className="btn btn-secondary"
+                          style={{
+                            fontSize: "0.85rem",
+                            padding: "6px 12px",
+                            // 🔹 스타일 조건부 변경 (UserPage와 동일하게)
+                            backgroundColor: pl.isFollowed
+                              ? "#ffebeb"
+                              : "#f3f4f6",
+                            color: pl.isFollowed ? "#dc3545" : "#374151",
+                            border: pl.isFollowed
+                              ? "1px solid #dc3545"
+                              : "none",
+                            fontWeight: "600",
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleFollowPublicPlaylist(pl.id);
+                          }}
+                        >
+                          {/* 🔹 텍스트 변경 */}
+                          {pl.isFollowed ? "💔 언팔로우" : "❤️ 팔로우"}
+                        </button>
                       </div>
                     </div>
 
@@ -1107,6 +1181,24 @@ export default function PlaylistsPage() {
                                           <span className="song-title">
                                             {item.songTitle || item.title}
                                           </span>
+                                          <button
+                                            type="button"
+                                            className="btn primary"
+                                            onClick={() =>
+                                              handlePlaySong(
+                                                item.songId || item.song_id,
+                                                item.songTitle || item.title
+                                              )
+                                            }
+                                            title="재생"
+                                            style={{
+                                              padding: "4px 8px",
+                                              fontSize: "12px",
+                                              marginRight: "4px",
+                                            }}
+                                          >
+                                            ▶️
+                                          </button>
                                           <button
                                             type="button"
                                             className="playlist-button"

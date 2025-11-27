@@ -5,32 +5,34 @@ import { fetchJson } from "../lib/http";
 export default function SongsPage() {
   const [songs, setSongs] = useState([]);
   const [artists, setArtists] = useState([]);
-
   const [title, setTitle] = useState("");
   const [artistId, setArtistId] = useState("");
-
   const [editId, setEditId] = useState(null);
   const [editTitle, setEditTitle] = useState("");
   const [editArtistId, setEditArtistId] = useState("");
-
   const [filterArtist, setFilterArtist] = useState("");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("title-asc");
-
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [playing, setPlaying] = useState(null); // 재생 중인 노래 ID
+  const [playing, setPlaying] = useState(null);
   const [error, setError] = useState("");
-
-  // 추천곡
   const [recommendations, setRecommendations] = useState([]);
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
-
-  // 상세 정보 모달
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
   const [songCharts, setSongCharts] = useState([]);
   const [chartsLoading, setChartsLoading] = useState(false);
+  // 플레이리스트 모달
+  const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
+  const [targetSongId, setTargetSongId] = useState(null);
+  const [myPlaylists, setMyPlaylists] = useState([]);
+  const [playlistLoading, setPlaylistLoading] = useState(false);
+  const [playlistError, setPlaylistError] = useState("");
+  // 페이지네이션
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+  const [currentPageGroup, setCurrentPageGroup] = useState(1);
 
   const artistNameById = useMemo(() => {
     const m = new Map();
@@ -59,8 +61,10 @@ export default function SongsPage() {
 
   useEffect(() => {
     loadAll();
+    setCurrentPage(1);
+    setCurrentPageGroup(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterArtist]);
+  }, [filterArtist, q, sort]);
 
   useEffect(() => {
     loadRecommendations();
@@ -123,7 +127,6 @@ export default function SongsPage() {
     }
   };
 
-  // 재생 함수
   const handlePlay = async (song) => {
     try {
       setPlaying(song.id);
@@ -140,28 +143,18 @@ export default function SongsPage() {
     }
   };
 
-  // 추천곡 로드
-  // 로직: 노래 목록 중 첫 번째 곡을 기준으로 추천곡을 가져옴
-  // 첫 곡이 차트 기록이 없으면 다음 곡을 시도 (최대 5개 곡까지)
-  // 선택된 곡이 올랐던 차트 기간(연도, 주차)에 같이 올랐던 다른 곡들을 추천
   const loadRecommendations = async () => {
     if (songs.length === 0) return;
     try {
       setRecommendationsLoading(true);
-
       let recs = [];
-
-      // 차트 기록이 있는 첫 곡 찾기
       for (let i = 0; i < Math.min(songs.length, 5); i++) {
         const songId = songs[i].id;
         const songTitle = songs[i].title;
-
         console.log(`🎵 [${i + 1}] 시도: ID=${songId}, 제목="${songTitle}"`);
-
         const recsForThisSong = await fetchJson(
           `${API}/songs/${songId}/recommendations`
         );
-
         if (recsForThisSong && recsForThisSong.length > 0) {
           console.log(
             `✅ 성공! ${songTitle}을(를) 기준으로 ${recsForThisSong.length}개의 추천곡 획득`
@@ -175,14 +168,12 @@ export default function SongsPage() {
           console.log(`❌ 차트 기록 없음: ${songTitle}`);
         }
       }
-
       if (recs.length > 0) {
         console.log(
           `🎯 최종 추천곡 데이터:`,
           recs.map((r) => `${r.title} (${r.artistName})`).join(", ")
         );
       }
-
       setRecommendations(recs || []);
     } catch (e) {
       console.error("❌ 추천곡 로드 에러:", e);
@@ -192,7 +183,6 @@ export default function SongsPage() {
     }
   };
 
-  // 상세 정보 모달 열기
   const handleOpenDetail = async (song) => {
     try {
       setSelectedSong(song);
@@ -214,12 +204,56 @@ export default function SongsPage() {
     setSongCharts([]);
   };
 
-  // 검색/정렬 적용
-  const view = useMemo(() => {
+  // 플레이리스트 모달 열기
+  const handleOpenPlaylistModal = async (songId) => {
+    try {
+      setTargetSongId(songId);
+      setPlaylistModalOpen(true);
+      setPlaylistError("");
+      setPlaylistLoading(true);
+      const data = await fetchJson(`${API}/playlists`);
+      setMyPlaylists(data);
+    } catch (e) {
+      console.error(e);
+      setPlaylistError(
+        e.message || "플레이리스트 목록을 불러오는데 실패했습니다."
+      );
+    } finally {
+      setPlaylistLoading(false);
+    }
+  };
+
+  // 플레이리스트에 곡 추가
+  const handleAddToPlaylist = async (playlistId) => {
+    if (!targetSongId) return;
+    try {
+      await fetchJson(`${API}/playlists/${playlistId}/items`, {
+        method: "POST",
+        body: JSON.stringify({ songId: targetSongId }),
+      });
+      alert("플레이리스트에 곡이 추가되었습니다. 🎵");
+      setPlaylistModalOpen(false);
+      setTargetSongId(null);
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "곡 추가에 실패했습니다.");
+    }
+  };
+
+  // 플레이리스트 모달 닫기
+  const handleClosePlaylistModal = () => {
+    setPlaylistModalOpen(false);
+    setTargetSongId(null);
+    setMyPlaylists([]);
+    setPlaylistError("");
+  };
+
+  // 전체 필터/정렬된 데이터
+  const allSongs = useMemo(() => {
     let data = songs;
     const t = q.trim().toLowerCase();
     if (t) data = data.filter((s) => s.title.toLowerCase().includes(t));
-    const [k, dir] = sort.split("-"); // title-asc | title-desc
+    const [k, dir] = sort.split("-");
     data = [...data].sort((a, b) => {
       const A = String(a[k]).toLowerCase();
       const B = String(b[k]).toLowerCase();
@@ -230,12 +264,32 @@ export default function SongsPage() {
     return data;
   }, [songs, q, sort]);
 
+  // 현재 페이지의 곡들
+  const view = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return allSongs.slice(start, end);
+  }, [allSongs, currentPage, itemsPerPage]);
+
+  // 페이지네이션 계산
+  const totalPages = Math.ceil(allSongs.length / itemsPerPage);
+  const pageGroupSize = 5;
+  const startPageOfGroup = (currentPageGroup - 1) * pageGroupSize + 1;
+  const endPageOfGroup = Math.min(
+    startPageOfGroup + pageGroupSize - 1,
+    totalPages
+  );
+  const pageNumbers = Array.from(
+    { length: Math.max(0, endPageOfGroup - startPageOfGroup + 1) },
+    (_, i) => startPageOfGroup + i
+  );
+
   return (
     <div className="content-page">
       <div className="content-container">
         <div className="page-header">
           <h1 className="page-title">
-            🎶 노래 <span className="badge">{view.length}</span>
+            🎶 노래 <span className="badge">{allSongs.length}</span>
           </h1>
           <button className="btn ghost" onClick={loadAll} title="새로고침">
             🔄 새로고침
@@ -327,7 +381,6 @@ export default function SongsPage() {
             <select
               value={artistId}
               onChange={(e) => setArtistId(e.target.value)}
-              style={{ flex: 1 }}
             >
               <option value="">아티스트 선택</option>
               {artists.map((a) => (
@@ -336,33 +389,24 @@ export default function SongsPage() {
                 </option>
               ))}
             </select>
-            <button
-              className="btn primary"
-              disabled={!title.trim() || !artistId || busy}
-            >
-              {busy ? (
-                <>
-                  <span className="loading-spinner"></span> 추가 중...
-                </>
-              ) : (
-                <>➕ 추가</>
-              )}
+            <button type="submit" className="btn primary" disabled={busy}>
+              ➕ 추가
             </button>
           </form>
-
-          {/* 에러 메시지 */}
-          {error && (
-            <div className="error-message">
-              <span>❗</span>
-              <span>{error}</span>
-            </div>
-          )}
 
           {/* 로딩 상태 */}
           {loading && (
             <div className="empty-state">
               <div className="empty-state-icon">⏳</div>
               <div className="empty-state-text">노래를 불러오는 중...</div>
+            </div>
+          )}
+
+          {/* 에러 상태 */}
+          {error && (
+            <div className="empty-state">
+              <div className="empty-state-icon">❌</div>
+              <div className="empty-state-text">{error}</div>
             </div>
           )}
 
@@ -378,93 +422,156 @@ export default function SongsPage() {
 
           {/* 노래 목록 */}
           {!loading && !error && view.length > 0 && (
-            <div className="items-grid">
-              {view.map((s) => (
-                <div key={s.id} className="item-card">
-                  {editId === s.id ? (
-                    <div className="edit-form">
-                      <input
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        placeholder="노래 제목"
-                      />
-                      <select
-                        value={editArtistId}
-                        onChange={(e) => setEditArtistId(e.target.value)}
-                      >
-                        <option value="">아티스트 선택</option>
-                        {artists.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        className="btn success"
-                        onClick={() => save(s.id)}
-                        disabled={busy}
-                      >
-                        💾 저장
-                      </button>
-                      <button
-                        className="btn muted"
-                        onClick={() => {
-                          setEditId(null);
-                          setEditTitle("");
-                          setEditArtistId("");
-                        }}
-                      >
-                        ↩️ 취소
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="item-card-header">
-                        <h3 className="item-card-title">{s.title}</h3>
-                      </div>
-                      <div className="item-card-meta">
-                        <span>🆔 #{s.id}</span>
-                        <span>
-                          👤 {artistNameById.get(s.artistId) || "Unknown"}
-                        </span>
-                      </div>
-                      <div className="item-card-actions">
-                        <button
-                          className="btn primary"
-                          onClick={() => handlePlay(s)}
-                          disabled={playing === s.id}
+            <>
+              <div className="items-grid">
+                {view.map((s) => (
+                  <div key={s.id} className="item-card">
+                    {editId === s.id ? (
+                      <div className="edit-form">
+                        <input
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          placeholder="노래 제목"
+                        />
+                        <select
+                          value={editArtistId}
+                          onChange={(e) => setEditArtistId(e.target.value)}
                         >
-                          {playing === s.id ? "▶️ 재생 중..." : "▶️ 재생"}
-                        </button>
+                          <option value="">아티스트 선택</option>
+                          {artists.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name}
+                            </option>
+                          ))}
+                        </select>
                         <button
-                          className="btn ghost"
-                          onClick={() => handleOpenDetail(s)}
-                        >
-                          ℹ️ 상세
-                        </button>
-                        <button
-                          className="btn ghost"
-                          onClick={() => {
-                            setEditId(s.id);
-                            setEditTitle(s.title);
-                            setEditArtistId(String(s.artistId));
-                          }}
-                        >
-                          ✏️ 수정
-                        </button>
-                        <button
-                          className="btn danger"
-                          onClick={() => remove(s.id)}
+                          className="btn success"
+                          onClick={() => save(s.id)}
                           disabled={busy}
                         >
-                          🗑️ 삭제
+                          ✅ 저장
+                        </button>
+                        <button
+                          className="btn ghost"
+                          onClick={() => setEditId(null)}
+                          disabled={busy}
+                        >
+                          ✖️ 취소
                         </button>
                       </div>
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <div className="item-card-header">
+                          <h3 className="item-card-title">{s.title}</h3>
+                        </div>
+                        <div className="item-card-meta">
+                          <span>🆔 #{s.id}</span>
+                          <span>
+                            👤 {artistNameById.get(s.artistId) || "Unknown"}
+                          </span>
+                        </div>
+                        <div className="item-card-actions">
+                          <button
+                            className="btn primary"
+                            onClick={() => handlePlay(s)}
+                            disabled={playing === s.id}
+                          >
+                            {playing === s.id ? "▶️ 재생 중..." : "▶️ 재생"}
+                          </button>
+                          <button
+                            className="btn ghost"
+                            onClick={() => handleOpenDetail(s)}
+                          >
+                            ℹ️ 상세
+                          </button>
+                          <button
+                            className="btn ghost"
+                            onClick={() => {
+                              setEditId(s.id);
+                              setEditTitle(s.title);
+                              setEditArtistId(String(s.artistId));
+                            }}
+                          >
+                            ✏️ 수정
+                          </button>
+                          <button
+                            className="btn ghost"
+                            onClick={() => handleOpenPlaylistModal(s.id)}
+                            disabled={busy}
+                          >
+                            📋 플레이리스트
+                          </button>
+                          <button
+                            className="btn danger"
+                            onClick={() => remove(s.id)}
+                            disabled={busy}
+                          >
+                            🗑️ 삭제
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* 페이지네이션 */}
+              {totalPages > 1 && (
+                <div
+                  style={{
+                    marginTop: 32,
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {/* 이전 그룹 버튼 */}
+                  <button
+                    className="btn secondary"
+                    onClick={() => {
+                      setCurrentPageGroup(currentPageGroup - 1);
+                      setCurrentPage((currentPageGroup - 2) * 5 + 1);
+                    }}
+                    disabled={currentPageGroup === 1}
+                    style={{ padding: "8px 12px" }}
+                  >
+                    ◀ 이전
+                  </button>
+
+                  {/* 페이지 번튼들 */}
+                  {pageNumbers.map((page) => (
+                    <button
+                      key={page}
+                      className={
+                        currentPage === page ? "btn primary" : "btn secondary"
+                      }
+                      onClick={() => setCurrentPage(page)}
+                      style={{
+                        padding: "8px 12px",
+                        minWidth: "36px",
+                      }}
+                    >
+                      {page}
+                    </button>
+                  ))}
+
+                  {/* 다음 그룹 버튼 */}
+                  <button
+                    className="btn secondary"
+                    onClick={() => {
+                      setCurrentPageGroup(currentPageGroup + 1);
+                      setCurrentPage(currentPageGroup * 5 + 1);
+                    }}
+                    disabled={endPageOfGroup === totalPages}
+                    style={{ padding: "8px 12px" }}
+                  >
+                    다음 ▶
+                  </button>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -508,146 +615,154 @@ export default function SongsPage() {
                 alignItems: "center",
               }}
             >
-              <h2 style={{ margin: 0 }}>🎵 {selectedSong.title}</h2>
+              <h2 style={{ margin: 0 }}>{selectedSong.title}</h2>
               <button
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: 24,
-                  cursor: "pointer",
-                }}
+                className="btn ghost"
                 onClick={handleCloseDetail}
+                style={{ fontSize: 20, padding: 0, width: 32, height: 32 }}
               >
                 ✕
               </button>
             </div>
 
-            {/* 내용 */}
-            <div style={{ padding: 20 }}>
-              {/* 기본 정보 */}
-              <div style={{ marginBottom: 24 }}>
-                <h3 style={{ marginTop: 0, marginBottom: 12 }}>기본 정보</h3>
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
-                >
-                  <div>
-                    <strong>곡 ID:</strong> {selectedSong.id}
-                  </div>
-                  <div>
-                    <strong>아티스트:</strong>{" "}
-                    {artistNameById.get(selectedSong.artistId) || "Unknown"}
-                  </div>
-                </div>
-              </div>
-
-              {/* 차트 기록 */}
-              <div>
-                <h3 style={{ marginTop: 0, marginBottom: 12 }}>📊 차트 기록</h3>
-                {chartsLoading ? (
-                  <p style={{ color: "#888" }}>로딩 중...</p>
-                ) : songCharts.length === 0 ? (
-                  <p style={{ color: "#888" }}>차트 기록이 없습니다.</p>
-                ) : (
-                  <div
-                    style={{
-                      border: "1px solid #eee",
-                      borderRadius: 4,
-                      overflow: "hidden",
-                    }}
-                  >
-                    <table
-                      style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                      }}
-                    >
-                      <thead>
-                        <tr style={{ background: "#f5f5f5" }}>
-                          <th
-                            style={{
-                              padding: 12,
-                              textAlign: "left",
-                              borderBottom: "1px solid #ddd",
-                              fontWeight: 600,
-                            }}
-                          >
-                            연도
-                          </th>
-                          <th
-                            style={{
-                              padding: 12,
-                              textAlign: "left",
-                              borderBottom: "1px solid #ddd",
-                              fontWeight: 600,
-                            }}
-                          >
-                            주차
-                          </th>
-                          <th
-                            style={{
-                              padding: 12,
-                              textAlign: "left",
-                              borderBottom: "1px solid #ddd",
-                              fontWeight: 600,
-                            }}
-                          >
-                            순위
-                          </th>
-                          <th
-                            style={{
-                              padding: 12,
-                              textAlign: "left",
-                              borderBottom: "1px solid #ddd",
-                              fontWeight: 600,
-                            }}
-                          >
-                            기간
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {songCharts.map((chart, idx) => (
-                          <tr
-                            key={idx}
-                            style={{
-                              borderBottom:
-                                idx < songCharts.length - 1
-                                  ? "1px solid #eee"
-                                  : "none",
-                            }}
-                          >
-                            <td style={{ padding: 12 }}>{chart.year}</td>
-                            <td style={{ padding: 12 }}>{chart.week}주차</td>
-                            <td style={{ padding: 12 }}>
-                              <strong>#{chart.rank}</strong>
-                            </td>
-                            <td
-                              style={{
-                                padding: 12,
-                                fontSize: "0.9em",
-                                color: "#666",
-                              }}
-                            >
-                              {chart.weekStartDate
-                                ? new Date(
-                                    chart.weekStartDate
-                                  ).toLocaleDateString()
-                                : "-"}{" "}
-                              ~{" "}
-                              {chart.weekEndDate
-                                ? new Date(
-                                    chart.weekEndDate
-                                  ).toLocaleDateString()
-                                : "-"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+            {/* 메타정보 */}
+            <div style={{ padding: 20, borderBottom: "1px solid #eee" }}>
+              <p>
+                <strong>ID:</strong> {selectedSong.id}
+              </p>
+              <p>
+                <strong>아티스트:</strong>{" "}
+                {artistNameById.get(selectedSong.artistId) || "Unknown"}
+              </p>
             </div>
+
+            {/* 차트 기록 */}
+            <div style={{ padding: 20 }}>
+              <h3>📊 차트 기록</h3>
+              {chartsLoading ? (
+                <p style={{ color: "#888" }}>로딩 중...</p>
+              ) : songCharts.length === 0 ? (
+                <p style={{ color: "#888" }}>차트 기록이 없습니다.</p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "2px solid #ddd" }}>
+                        <th style={{ padding: 8, textAlign: "left" }}>연도</th>
+                        <th style={{ padding: 8, textAlign: "left" }}>주차</th>
+                        <th style={{ padding: 8, textAlign: "left" }}>순위</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {songCharts.map((chart, idx) => (
+                        <tr
+                          key={idx}
+                          style={{ borderBottom: "1px solid #eee" }}
+                        >
+                          <td style={{ padding: 8 }}>{chart.year}</td>
+                          <td style={{ padding: 8 }}>{chart.week}</td>
+                          <td style={{ padding: 8 }}>#{chart.rank}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 플레이리스트 선택 모달 */}
+      {playlistModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={handleClosePlaylistModal}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 8,
+              padding: 24,
+              maxWidth: 400,
+              maxHeight: "80vh",
+              overflow: "auto",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ marginTop: 0, marginBottom: 16 }}>
+              📋 플레이리스트 선택
+            </h2>
+
+            {playlistError && (
+              <p style={{ color: "#d32f2f", marginBottom: 12 }}>
+                {playlistError}
+              </p>
+            )}
+
+            {playlistLoading ? (
+              <p style={{ color: "#888" }}>로딩 중...</p>
+            ) : myPlaylists.length === 0 ? (
+              <p style={{ color: "#888" }}>플레이리스트가 없습니다.</p>
+            ) : (
+              <ul
+                style={{
+                  listStyle: "none",
+                  padding: 0,
+                  margin: 0,
+                  border: "1px solid #eee",
+                  borderRadius: 4,
+                }}
+              >
+                {myPlaylists.map((pl, idx) => (
+                  <li
+                    key={pl.id}
+                    style={{
+                      borderBottom:
+                        idx < myPlaylists.length - 1
+                          ? "1px solid #eee"
+                          : "none",
+                      padding: 12,
+                      cursor: "pointer",
+                      background: "#fff",
+                      transition: "background 0.2s",
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = "#f5f5f5")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "#fff")
+                    }
+                    onClick={() => handleAddToPlaylist(pl.id)}
+                  >
+                    <strong>{pl.name}</strong>
+                    {pl.note && (
+                      <p
+                        style={{
+                          margin: "4px 0 0 0",
+                          fontSize: "0.9em",
+                          color: "#666",
+                        }}
+                      >
+                        {pl.note}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       )}
