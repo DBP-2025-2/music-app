@@ -405,6 +405,29 @@ export default function PlaylistsPage() {
       setPlaylistPickerLoading(false);
     }
   }
+  // 🔹 [추가] 공개 플레이리스트 팔로우하기
+  async function handleFollowPublicPlaylist(playlistId) {
+    try {
+      // API 호출 (토글 방식)
+      const res = await fetchJson(`${API}/playlists/${playlistId}/follow`, {
+        method: "POST",
+      });
+
+      if (res.followed) {
+        alert("이 플레이리스트를 팔로우했습니다! 💖\n(내 목록에서 확인 가능)");
+      } else {
+        alert("팔로우를 취소했습니다. 💔");
+      }
+      
+      // 목록 갱신 (팔로워 수 업데이트 등을 위해)
+      if (publicMode === "search") handleSearchPublic();
+      else handleLoadPopularPublic();
+
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "오류가 발생했습니다.");
+    }
+  }
 
   // ─────────────────────────────
   // 모달에서 특정 플레이리스트 선택 → 곡 추가
@@ -1020,15 +1043,25 @@ export default function PlaylistsPage() {
                       <div className="col-followers">{followerCount}명</div>
 
                       <div className="col-actions">
-                        <button
-                          className="btn btn-secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            alert("팔로우 기능은 아직 미구현입니다 :)");
-                          }}
-                        >
-                          팔로우
-                        </button>
+                            <button
+                              className="btn btn-secondary"
+                              style={{ 
+                                fontSize: "0.85rem", 
+                                padding: "6px 12px",
+    // 🔹 스타일 조건부 변경 (UserPage와 동일하게)
+                                backgroundColor: pl.isFollowed ? "#ffebeb" : "#f3f4f6", 
+                                color: pl.isFollowed ? "#dc3545" : "#374151", 
+                                border: pl.isFollowed ? "1px solid #dc3545" : "none",
+                                fontWeight: "600"
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleFollowPublicPlaylist(pl.id); 
+                              }}
+                            >
+                              {/* 🔹 텍스트 변경 */}
+                              {pl.isFollowed ? "💔 언팔로우" : "❤️ 팔로우"}
+                              </button>
                       </div>
                     </div>
 

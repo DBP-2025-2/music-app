@@ -1,4 +1,3 @@
-// backend/src/routes/playlists.js
 import { Router } from "express";
 import {
   getPlaylists,
@@ -9,7 +8,13 @@ import {
   addPlaylistItem,
   deletePlaylistItem,
   searchPublicPlaylists,
-  getPopularPublicPlaylists,   
+  getPopularPublicPlaylists,
+  // 🔽 [추가] 새로 필요한 DB 함수들을 임포트합니다.
+  getPublicPlaylistsByUserId,
+  checkFollow,
+  createFollow,
+  deleteFollow,
+  getPlaylistOwnerId
 } from "../store/db.mysql.js";
 import { authMiddleware } from "./auth.js";
 
@@ -21,8 +26,22 @@ const router = Router();
  */
 router.get("/", authMiddleware, async (req, res, next) => {
   try {
-    const userId = req.user.userId;           // 🔥 토큰에서 userId
+    const userId = req.user.userId;
     const playlists = await getPlaylists(userId);
+    res.json(playlists);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 🔽 [신규] 특정 유저의 공개 플레이리스트 목록 (UserPage용)
+router.get("/user/:userId", authMiddleware, async (req, res, next) => {
+  try {
+    const userId = Number(req.params.userId);
+    const viewerId = req.user.userId; // 🔹 토큰에서 내 ID 가져오기
+    
+    // DB 함수에 viewerId도 전달
+    const playlists = await getPublicPlaylistsByUserId(userId, viewerId);
     res.json(playlists);
   } catch (err) {
     next(err);
@@ -57,25 +76,58 @@ router.post("/", authMiddleware, async (req, res, next) => {
 
 // GET /playlists/public?q=키워드
 // GET /playlists/public?q=키워드&sort=followers
-router.get("/public", async (req, res, next) => {
+router.get("/public", authMiddleware, async (req, res, next) => {
   try {
     const q = (req.query.q || "").toString();
     const sort = (req.query.sort || "").toString();
+    const viewerId = req.user.userId; 
 
     if (sort === "followers") {
-      // 팔로우 수 기준 인기 순
-      const results = await getPopularPublicPlaylists({ limit: 50 });
+      const results = await getPopularPublicPlaylists({ limit: 50, viewerId });
       return res.json(results);
     }
 
-    // 기본: 검색 + 최신순
-    const results = await searchPublicPlaylists({ q });
+    const results = await searchPublicPlaylists({ q, viewerId });
     res.json(results);
   } catch (err) {
     next(err);
   }
 });
 
+router.post("/:id/follow", authMiddleware, async (req, res, next) => {
+  try {
+    const myId = req.user.userId;
+    const playlistId = Number(req.params.id);
+    
+    const ownerId = await getPlaylistOwnerId(playlistId);
+    if (ownerId === myId) {
+      return res.status(400).json({ message: "자신의 플레이리스트는 팔로우할 수 없습니다." });
+    }
+    
+    const isFollowing = await checkFollow(myId, playlistId, 'playlist');
+
+    if (isFollowing) {
+      await deleteFollow(myId, playlistId, 'playlist');
+      return res.json({ followed: false });
+    } else {
+      await createFollow(myId, playlistId, 'playlist');
+      return res.json({ followed: true });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/:id/follow", authMiddleware, async (req, res, next) => {
+  try {
+    const myId = req.user.userId;
+    const playlistId = Number(req.params.id);
+    const isFollowing = await checkFollow(myId, playlistId, 'playlist');
+    res.json({ followed: isFollowing });
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * PATCH /playlists/:id
@@ -150,7 +202,6 @@ router.post("/:id/items", authMiddleware, async (req, res, next) => {
 
     res.status(201).json(item);
   } catch (err) {
-    // 이미 들어있는 곡이면 400으로
     if (
       String(err.message).includes(
         "이미 이 플레이리스트에 있는 곡입니다."
@@ -182,7 +233,7 @@ router.delete(
     }
   }
 );
-// GET /playlists/public/search?q=...
+
 router.get("/public/search", async (req, res, next) => {
   try {
     const q = req.query.q || "";
@@ -193,7 +244,6 @@ router.get("/public/search", async (req, res, next) => {
   }
 });
 
-// GET /playlists/public/popular
 router.get("/public/popular", async (req, res, next) => {
   try {
     const rows = await getPopularPublicPlaylists();

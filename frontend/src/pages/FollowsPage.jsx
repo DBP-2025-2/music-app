@@ -1,9 +1,11 @@
-// frontend/src/pages/FollowsPage.jsx
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom"; // 이동 기능 훅
 import { API } from "../lib/api";
 import { fetchJson } from "../lib/http";
 
 export default function FollowsPage() {
+  const navigate = useNavigate(); // 페이지 이동 함수
+
   const [rows, setRows] = useState([]);
   const [recommendations, setRecommendations] = useState({ users: [], artists: [] });
   const [loading, setLoading] = useState(true);
@@ -145,18 +147,35 @@ export default function FollowsPage() {
 
             <ul style={{ listStyle: "none", padding: 0 }}>
                 {rows.map((item, idx) => {
-                // [수정] 데이터가 camelCase로 오든 snake_case로 오든 둘 다 체크하도록 변경
                 const type = item.targetType || item.target_type || "user";
                 const id = item.followingId || item.following_id || item.id;
                 const name = item.targetName || item.target_name || item.name || item.nickname;
                 const createdDate = item.createdAt || item.created_at || "";
+                
+                // 🔹 백엔드에서 받아온 playlist 작성자 ID
+                const ownerId = item.owner_id; 
 
-                const badgeColor = type === "user" ? "#20c997" : "#7950f2";
-                // 이름이 있으면 이름, 없으면 ID 표시
+                // 뱃지 색상 설정 (플레이리스트는 파란색 계열로 추가)
+                let badgeColor = "#7950f2"; 
+                if (type === "user") badgeColor = "#20c997"; 
+                if (type === "playlist") badgeColor = "#4c6ef5"; 
+
                 const displayName = name ? name : `ID: ${id}`;
 
                 return (
-                  <li key={idx} style={styles.listItem}>
+                  <li 
+                    key={idx} 
+                    style={{...styles.listItem, cursor: "pointer"}} 
+                    onClick={() => {
+                        // 🔹 클릭 시 이동 로직 강화
+                        if (type === 'user') navigate(`/user/${id}`);
+                        else if (type === 'artist') navigate(`/artist/${id}`);
+                        else if (type === 'playlist' && ownerId) {
+                           // 플레이리스트를 누르면 작성자의 유저 페이지로 이동
+                           navigate(`/user/${ownerId}`);
+                        }
+                    }}
+                  >
                     <div style={{ display: "flex", alignItems: "center" }}>
                       <span style={{ ...styles.badge, backgroundColor: badgeColor }}>
                         {type}
@@ -166,11 +185,19 @@ export default function FollowsPage() {
                         <span style={{ fontSize: "0.8rem", color: "#aaa", marginLeft: "8px" }}>
                           ({createdDate.substring(0, 10)})
                         </span>
+                        {/* 플레이리스트인 경우 추가 설명 */}
+                        {type === 'playlist' && (
+                           <span style={{ fontSize: "0.75rem", color: "#888", marginLeft: "5px" }}>
+                             (작성자 페이지로 이동)
+                           </span>
+                        )}
                       </div>
                     </div>
                     <button
-                      // [수정] 삭제 버튼에도 찾은 id와 type을 넣어줍니다.
-                      onClick={() => handleUnfollow(id, type)}
+                      onClick={(e) => {
+                        e.stopPropagation(); 
+                        handleUnfollow(id, type);
+                      }}
                       style={styles.btnDanger}
                     >
                       삭제
