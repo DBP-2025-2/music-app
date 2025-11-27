@@ -238,36 +238,37 @@ export async function getSongs({ artistId, q } = {}) {
   const params = [];
   const where = [];
 
-  // 아티스트 기준 필터
+  let query = `
+    SELECT 
+      s.${SONG_ID_COL}    AS id,
+      s.${SONG_TITLE_COL} AS title,
+      
+      (SELECT name FROM ${ARTISTS_TABLE} a 
+       JOIN ${SONG_ARTISTS_TABLE} sa_main ON a.${ARTIST_ID_COL} = sa_main.${SA_ARTIST_ID_COL}
+       WHERE sa_main.${SA_SONG_ID_COL} = s.${SONG_ID_COL} 
+       ORDER BY sa_main.${SA_DISPLAY_ORDER_COL} ASC LIMIT 1) AS artistName
+
+    FROM ${SONGS_TABLE} s
+  `;
+
   if (artistId) {
-    where.push(`sa.${SA_ARTIST_ID_COL} = ?`);
+    query += ` JOIN ${SONG_ARTISTS_TABLE} sa_filter ON s.${SONG_ID_COL} = sa_filter.${SA_SONG_ID_COL} `;
+    where.push(`sa_filter.${SA_ARTIST_ID_COL} = ?`);
     params.push(artistId);
   }
 
-  // 제목 검색 (title_norm 사용, 소문자로 비교)
   if (q) {
     where.push(`s.title_norm LIKE ?`);
     params.push(`%${q.toLowerCase()}%`);
   }
 
-  const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  if (where.length > 0) {
+    query += ` WHERE ${where.join(" AND ")} `;
+  }
 
-  const [rows] = await pool.query(
-    `
-    SELECT
-      s.${SONG_ID_COL}    AS id,
-      s.${SONG_TITLE_COL} AS title,
-      sa.${SA_ARTIST_ID_COL} AS artistId
-    FROM ${SONGS_TABLE} s
-    LEFT JOIN ${SONG_ARTISTS_TABLE} sa
-      ON s.${SONG_ID_COL} = sa.${SA_SONG_ID_COL}
-     AND (sa.${SA_DISPLAY_ORDER_COL} = 1 OR sa.${SA_DISPLAY_ORDER_COL} IS NULL)
-    ${whereClause}
-    ORDER BY s.${SONG_ID_COL} DESC
-    `,
-    params
-  );
+  query += ` ORDER BY s.${SONG_ID_COL} DESC`;
 
+  const [rows] = await pool.query(query, params);
   return rows;
 }
 
@@ -489,7 +490,7 @@ export async function searchSongs({ q }) {
 }
 
 
-export async function searchPublicPlaylists({ q, viewerId }) { // 🔹 viewerId 추가
+export async function searchPublicPlaylists({ q, viewerId }) {
   const params = [];
   let where = `WHERE p.${PLAYLIST_IS_PUBLIC_COL} = 1`;
 
@@ -499,7 +500,7 @@ export async function searchPublicPlaylists({ q, viewerId }) { // 🔹 viewerId 
     params.push(like, like);
   }
 
-  // 🔹 viewerId 파라미터 추가
+  // viewerId 파라미터 추가
   params.push(viewerId);
 
   const [rows] = await pool.query(
@@ -512,7 +513,7 @@ export async function searchPublicPlaylists({ q, viewerId }) { // 🔹 viewerId 
       COUNT(DISTINCT pi.${ITEM_ID_COL}) AS trackCount,
       COALESCE(f.followers, 0)  AS followerCount,
       
-      -- 🔹 [추가] 내 팔로우 여부 확인
+      -- 내 팔로우 여부 확인
       MAX(CASE WHEN my_f.follower_id IS NOT NULL THEN 1 ELSE 0 END) AS isFollowed
 
     FROM ${PLAYLISTS_TABLE} p
@@ -525,7 +526,7 @@ export async function searchPublicPlaylists({ q, viewerId }) { // 🔹 viewerId 
       FROM ${FOLLOWS_TABLE} WHERE target_type = 'playlist' GROUP BY following_id
     ) f ON f.following_id = p.${PLAYLIST_ID_COL}
 
-    -- 🔹 [추가] 내 팔로우 정보 조인
+    -- 내 팔로우 정보 조인
     LEFT JOIN ${FOLLOWS_TABLE} my_f 
       ON my_f.following_id = p.${PLAYLIST_ID_COL} 
       AND my_f.target_type = 'playlist'
@@ -542,7 +543,7 @@ export async function searchPublicPlaylists({ q, viewerId }) { // 🔹 viewerId 
 }
 
 // 팔로우 수 기준 상위 공개 플레이리스트
-export async function getPopularPublicPlaylists({ limit = 50, viewerId } = {}) { // 🔹 viewerId 추가
+export async function getPopularPublicPlaylists({ limit = 50, viewerId } = {}) {
   const [rows] = await pool.query(
     `
     SELECT
@@ -553,7 +554,7 @@ export async function getPopularPublicPlaylists({ limit = 50, viewerId } = {}) {
       COUNT(DISTINCT pi.${ITEM_ID_COL}) AS trackCount,
       COALESCE(f.followers, 0)  AS followerCount,
 
-      -- 🔹 [추가] 내 팔로우 여부 확인
+      -- 내 팔로우 여부 확인
       MAX(CASE WHEN my_f.follower_id IS NOT NULL THEN 1 ELSE 0 END) AS isFollowed
 
     FROM ${PLAYLISTS_TABLE} p
@@ -565,7 +566,7 @@ export async function getPopularPublicPlaylists({ limit = 50, viewerId } = {}) {
       FROM ${FOLLOWS_TABLE} WHERE target_type = 'playlist' GROUP BY following_id
     ) f ON f.following_id = p.${PLAYLIST_ID_COL}
 
-    -- 🔹 [추가] 내 팔로우 정보 조인
+    -- 내 팔로우 정보 조인
     LEFT JOIN ${FOLLOWS_TABLE} my_f 
       ON my_f.following_id = p.${PLAYLIST_ID_COL} 
       AND my_f.target_type = 'playlist'
@@ -576,13 +577,11 @@ export async function getPopularPublicPlaylists({ limit = 50, viewerId } = {}) {
     ORDER BY followerCount DESC, p.${PLAYLIST_ID_COL} DESC
     LIMIT ?
     `,
-    [viewerId, limit] // 🔹 파라미터 순서 주의
+    [viewerId, limit]
   );
 
   return rows;
 }
-
-
 
 // DELETE /playlists/:id
 export async function deletePlaylist(id) {
@@ -656,8 +655,6 @@ export async function getPlaylistItems(playlistId) {
 
   return rows;
 }
-
-
 
 // POST /playlists/:id/items
 export async function addPlaylistItem({ playlistId, songId }) {
@@ -761,6 +758,59 @@ export async function getSongCharts(songId) {
   return rows;
 }
 
+// GET /songs/:id/recommendations - 특정 노래와 같은 차트 기간에 올랐던 곡들 추천
+export async function getRecommendedSongs(songId) {
+  try {
+    // 1) 해당 곡이 올랐던 차트 기간들 조회
+    const [chartPeriods] = await pool.query(
+      `
+      SELECT DISTINCT year, week
+      FROM ${CHARTS_TABLE}
+      WHERE song_id = ?
+      LIMIT 5
+      `,
+      [songId]
+    );
+
+    if (chartPeriods.length === 0) {
+      return [];
+    }
+
+    // 2) 같은 차트 기간에 올랐던 다른 곡들 조회
+    const placeholders = chartPeriods.map(() => "(c.year = ? AND c.week = ?)").join(" OR ");
+    const params = [];
+    chartPeriods.forEach((period) => {
+      params.push(period.year, period.week);
+    });
+    params.push(songId); // WHERE song_id != ?
+
+    const [recommendedRows] = await pool.query(
+      `
+      SELECT DISTINCT
+        s.song_id AS id,
+        s.title,
+        a.name AS artistName,
+        COUNT(DISTINCT (c.year * 100 + c.week)) AS chartCount
+      FROM ${CHARTS_TABLE} c
+      JOIN ${SONGS_TABLE} s ON c.song_id = s.song_id
+      LEFT JOIN ${SONG_ARTISTS_TABLE} sa ON s.song_id = sa.song_id
+      LEFT JOIN ${ARTISTS_TABLE} a ON sa.artist_id = a.artist_id
+      WHERE (${placeholders})
+      AND c.song_id != ?
+      GROUP BY s.song_id, s.title, a.name
+      ORDER BY chartCount DESC, s.song_id DESC
+      LIMIT 10
+      `,
+      params
+    );
+
+    return recommendedRows;
+  } catch (error) {
+    console.error(`❌ [getRecommendedSongs] Error:`, error.message);
+    throw error;
+  }
+}
+
 // --------------------------------------------------------------------
 // Follows  (READ-ONLY 목록용)
 // --------------------------------------------------------------------
@@ -836,7 +886,7 @@ export async function getMyFollows(followerId) {
       CASE 
         WHEN f.target_type = 'user' THEN u.nickname 
         WHEN f.target_type = 'artist' THEN a.name 
-        WHEN f.target_type = 'playlist' THEN p.name  -- 🔹 추가됨
+        WHEN f.target_type = 'playlist' THEN p.name 
       END AS target_name,
       
       -- 🔹 플레이리스트일 경우 작성자(owner) ID가 필요함 (클릭 시 이동 위해)
@@ -848,7 +898,7 @@ export async function getMyFollows(followerId) {
     FROM follows f
     LEFT JOIN users u ON f.following_id = u.user_id AND f.target_type = 'user'
     LEFT JOIN artists a ON f.following_id = a.artist_id AND f.target_type = 'artist'
-    LEFT JOIN playlists p ON f.following_id = p.playlist_id AND f.target_type = 'playlist' -- 🔹 추가됨
+    LEFT JOIN playlists p ON f.following_id = p.playlist_id AND f.target_type = 'playlist'
     WHERE f.follower_id = ?
     ORDER BY f.created_at DESC
   `;
@@ -1037,7 +1087,7 @@ export async function checkFollow(followerId, followingId, targetType) {
 }
 
 // === 특정 유저의 공개 플레이리스트 조회 (UserPage용) ===
-export async function getPublicPlaylistsByUserId(userId, viewerId) { // 🔹 viewerId 추가됨
+export async function getPublicPlaylistsByUserId(userId, viewerId) {
   const [rows] = await pool.query(
     `
     SELECT
@@ -1069,7 +1119,7 @@ export async function getPublicPlaylistsByUserId(userId, viewerId) { // 🔹 vie
     GROUP BY p.${PLAYLIST_ID_COL}
     ORDER BY p.${PLAYLIST_ID_COL} DESC
     `,
-    [viewerId, userId] // 🔹 파라미터 순서 주의 (보는사람ID, 주인ID)
+    [viewerId, userId] 
   );
   return rows;
 }
