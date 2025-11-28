@@ -745,7 +745,7 @@ export async function getSongCharts(songId) {
       chart_type AS chartType,
       year,
       week,
-      \`rank\` AS rank,
+      \`rank\` AS chartRank,
       week_start_date AS weekStartDate,
       week_end_date AS weekEndDate
     FROM ${CHARTS_TABLE}
@@ -807,6 +807,33 @@ export async function getRecommendedSongs(songId) {
     return recommendedRows;
   } catch (error) {
     console.error(`❌ [getRecommendedSongs] Error:`, error.message);
+    throw error;
+  }
+}
+
+// GET /songs/popular - 차트에 가장 많이 오른 인기곡들
+export async function getPopularSongs(limit = 10) {
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        s.song_id AS id,
+        s.title,
+        a.name AS artistName,
+        COUNT(*) AS chartCount
+      FROM ${CHARTS_TABLE} c
+      JOIN ${SONGS_TABLE} s ON c.song_id = s.song_id
+      LEFT JOIN ${SONG_ARTISTS_TABLE} sa ON s.song_id = sa.song_id AND sa.display_order = 1
+      LEFT JOIN ${ARTISTS_TABLE} a ON sa.artist_id = a.artist_id
+      GROUP BY s.song_id, s.title, a.name
+      ORDER BY chartCount DESC, s.song_id DESC
+      LIMIT ?
+      `,
+      [limit]
+    );
+    return rows;
+  } catch (error) {
+    console.error(`❌ [getPopularSongs] Error:`, error.message);
     throw error;
   }
 }

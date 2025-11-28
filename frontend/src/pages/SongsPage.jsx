@@ -34,12 +34,6 @@ export default function SongsPage() {
   const itemsPerPage = 20;
   const [currentPageGroup, setCurrentPageGroup] = useState(1);
 
-  const artistNameById = useMemo(() => {
-    const m = new Map();
-    artists.forEach((a) => m.set(a.id, a.name));
-    return m;
-  }, [artists]);
-
   const loadAll = async () => {
     try {
       setError("");
@@ -68,8 +62,7 @@ export default function SongsPage() {
 
   useEffect(() => {
     loadRecommendations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [songs]);
+  }, []);
 
   const add = async (e) => {
     e.preventDefault();
@@ -144,39 +137,25 @@ export default function SongsPage() {
   };
 
   const loadRecommendations = async () => {
-    if (songs.length === 0) return;
     try {
       setRecommendationsLoading(true);
-      let recs = [];
-      for (let i = 0; i < Math.min(songs.length, 5); i++) {
-        const songId = songs[i].id;
-        const songTitle = songs[i].title;
-        console.log(`🎵 [${i + 1}] 시도: ID=${songId}, 제목="${songTitle}"`);
-        const recsForThisSong = await fetchJson(
-          `${API}/songs/${songId}/recommendations`
-        );
-        if (recsForThisSong && recsForThisSong.length > 0) {
-          console.log(
-            `✅ 성공! ${songTitle}을(를) 기준으로 ${recsForThisSong.length}개의 추천곡 획득`
-          );
-          console.log(
-            `📊 추천곡 기준: 이 곡이 올랐던 차트 기간과 같은 기간에 올랐던 다른 곡들`
-          );
-          recs = recsForThisSong;
-          break;
-        } else {
-          console.log(`❌ 차트 기록 없음: ${songTitle}`);
-        }
-      }
-      if (recs.length > 0) {
+      
+      // 차트 기반 인기곡 바로 로드
+      console.log(`🔥 인기곡을 가져옵니다...`);
+      const popularSongs = await fetchJson(`${API}/songs/popular?limit=10`);
+      
+      if (popularSongs && popularSongs.length > 0) {
+        console.log(`✅ 인기곡 ${popularSongs.length}개 획득`);
         console.log(
-          `🎯 최종 추천곡 데이터:`,
-          recs.map((r) => `${r.title} (${r.artistName})`).join(", ")
+          `🎯 인기곡 데이터:`,
+          popularSongs.map((r) => `${r.title} (${r.artistName})`).join(", ")
         );
+        setRecommendations(popularSongs);
+      } else {
+        setRecommendations([]);
       }
-      setRecommendations(recs || []);
     } catch (e) {
-      console.error("❌ 추천곡 로드 에러:", e);
+      console.error("❌ 인기곡 로드 에러:", e);
       setRecommendations([]);
     } finally {
       setRecommendationsLoading(false);
@@ -297,14 +276,16 @@ export default function SongsPage() {
         </div>
 
         <div className="content-panel">
-          {/* 추천곡 섹션 */}
+          {/* 인기곡 섹션 */}
           <div style={{ marginBottom: 40 }}>
-            <h2 style={{ margin: 0, marginBottom: 20 }}>💡 추천곡</h2>
+            <h2 style={{ margin: 0, marginBottom: 20 }}>
+              🔥 인기곡 (차트 많이 오른 순)
+            </h2>
 
             {recommendationsLoading ? (
               <p style={{ color: "#888" }}>로딩 중...</p>
             ) : recommendations.length === 0 ? (
-              <p style={{ color: "#888" }}>추천할 곡이 없습니다.</p>
+              <p style={{ color: "#888" }}>인기곡을 불러올 수 없습니다.</p>
             ) : (
               <div
                 style={{
@@ -329,6 +310,9 @@ export default function SongsPage() {
                     </div>
                     <div className="item-card-meta">
                       <span>👤 {rec.artistName || "Unknown"}</span>
+                      {rec.chartCount && (
+                        <span>📊 {rec.chartCount}회</span>
+                      )}
                     </div>
                     <div className="item-card-actions">
                       <button
@@ -467,7 +451,7 @@ export default function SongsPage() {
                         <div className="item-card-meta">
                           <span>🆔 #{s.id}</span>
                           <span>
-                            👤 {artistNameById.get(s.artistId) || "Unknown"}
+                            👤 {s.artistName || "Unknown"}
                           </span>
                         </div>
                         <div className="item-card-actions">
@@ -632,7 +616,7 @@ export default function SongsPage() {
               </p>
               <p>
                 <strong>아티스트:</strong>{" "}
-                {artistNameById.get(selectedSong.artistId) || "Unknown"}
+                {selectedSong.artistName || "Unknown"}
               </p>
             </div>
 
@@ -661,7 +645,7 @@ export default function SongsPage() {
                         >
                           <td style={{ padding: 8 }}>{chart.year}</td>
                           <td style={{ padding: 8 }}>{chart.week}</td>
-                          <td style={{ padding: 8 }}>#{chart.rank}</td>
+                          <td style={{ padding: 8 }}>#{chart.chartRank}</td>
                         </tr>
                       ))}
                     </tbody>

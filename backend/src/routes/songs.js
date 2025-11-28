@@ -8,9 +8,23 @@ import {
   deleteSong,
   searchSongs,
   getSongCharts,
+  getPopularSongs,
 } from "../store/db.mysql.js";
 
 const router = Router();
+
+/**
+ * GET /songs/popular - 차트에 가장 많이 오른 인기곡
+ */
+router.get("/popular", authMiddleware, async (req, res, next) => {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const songs = await getPopularSongs(limit);
+    res.json(songs);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * GET /songs
