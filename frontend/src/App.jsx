@@ -14,7 +14,8 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ChartsYearPage from "./pages/ChartsYearPage";
 import UserPage from "./pages/UserPage";
-import ArtistPage from "./pages/ArtistPage"; // 👈 [중요] 이 줄이 빠져 있었습니다!
+import ArtistPage from "./pages/ArtistPage";
+import AlbumDetailPage from "./pages/AlbumDetailPage";
 
 /* ---------- 공통 레이아웃 ---------- */
 
@@ -35,7 +36,7 @@ function Layout({ children, isLoggedIn, onLogout }) {
           <NavLink to="/follows" className={({ isActive }) => "nav-link" + (isActive ? " nav-link--active" : "")}>Follows</NavLink>
           <NavLink to="/history" className={({ isActive }) => "nav-link" + (isActive ? " nav-link--active" : "")}>History</NavLink>
           <NavLink to="/users" className={({ isActive }) => "nav-link" + (isActive ? " nav-link--active" : "")}>Users</NavLink>
-          
+
           {isLoggedIn && (
             <button className="nav-link logout-btn" onClick={onLogout}>🚪 로그아웃</button>
           )}
@@ -80,11 +81,12 @@ export default function App() {
             <Route path="/follows" element={<FollowsPage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/users" element={<UsersPage />} />
-            
+
             {/* 상세 페이지 라우트 */}
             <Route path="/charts/year/:year" element={<ChartsYearPage />} />
             <Route path="/user/:userId" element={<UserPage />} />
             <Route path="/artist/:artistId" element={<ArtistPage />} />
+            <Route path="/album/:id" element={<AlbumDetailPage />} /> {/* 🔹 [추가] */}
           </Routes>
         </Layout>
       ) : (

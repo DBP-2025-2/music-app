@@ -923,7 +923,7 @@ export async function getRecommendations(myEmail) {
 // 🔍 팔로우 대상 검색 (유저+아티스트)
 export async function searchFollowTargets(keyword) {
   const like = `%${keyword}%`;
-  
+
   const [users] = await pool.query(
     `SELECT user_id as id, nickname as name, 'user' as type 
      FROM users 
@@ -1144,7 +1144,7 @@ export async function getPublicPlaylistsByUserId(userId, viewerId) {
     GROUP BY p.${PLAYLIST_ID_COL}
     ORDER BY p.${PLAYLIST_ID_COL} DESC
     `,
-    [viewerId, userId] 
+    [viewerId, userId]
   );
   return rows;
 }
@@ -1155,4 +1155,44 @@ export async function getPlaylistOwnerId(playlistId) {
     [playlistId]
   );
   return rows[0]?.userId || null;
+}
+
+// 1. 앨범 상세 정보 조회 (제목, 가수명, 연도 등)
+export async function getAlbumById(albumId) {
+  const [rows] = await pool.query(
+    `
+    SELECT 
+      al.${ALBUM_ID_COL}    AS id,
+      al.${ALBUM_TITLE_COL} AS title,
+      YEAR(al.${ALBUM_CREATED_AT_COL}) AS year,
+      ar.name               AS artistName
+    FROM ${ALBUMS_TABLE} al
+    LEFT JOIN ${ARTISTS_TABLE} ar ON al.${ALBUM_ARTIST_ID_COL} = ar.${ARTIST_ID_COL}
+    WHERE al.${ALBUM_ID_COL} = ?
+    `,
+    [albumId]
+  );
+  return rows[0] || null;
+}
+
+// 2. 앨범 수록곡 조회
+export async function getAlbumTracks(albumId) {
+  const [rows] = await pool.query(
+    `
+    SELECT 
+      s.${SONG_ID_COL}    AS id,
+      s.${SONG_TITLE_COL} AS title,
+      -- 가수 이름 (피처링 포함)
+      (SELECT GROUP_CONCAT(a.name SEPARATOR ', ')
+      FROM ${SONG_ARTISTS_TABLE} sa
+      JOIN ${ARTISTS_TABLE} a ON sa.${SA_ARTIST_ID_COL} = a.${ARTIST_ID_COL}
+      WHERE sa.${SA_SONG_ID_COL} = s.${SONG_ID_COL}
+      ORDER BY sa.${SA_DISPLAY_ORDER_COL} ASC) AS artistName
+    FROM ${SONGS_TABLE} s
+    WHERE s.${SONG_ALBUM_ID_COL} = ?
+    ORDER BY s.${SONG_ID_COL} ASC
+    `,
+    [albumId]
+  );
+  return rows;
 }

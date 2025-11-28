@@ -1,11 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
+// 🔹 [추가] useSearchParams 가져오기 (URL 관리용)
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { API } from "../lib/api";
 import { fetchJson } from "../lib/http";
 
 export default function AlbumsPage() {
+  const navigate = useNavigate();
+  // 🔹 [추가] URL 쿼리 파라미터 훅 사용
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // 🔹 [변경] q와 sort를 useState가 아닌 URL에서 가져오도록 수정
+  const q = searchParams.get("q") || "";
+  const sort = searchParams.get("sort") || "year-desc";
+
   const [albums, setAlbums] = useState([]);
   const [artists, setArtists] = useState([]);
 
+  // 추가/수정용 State (이건 페이지 이동과 상관없으니 useState 유지)
   const [title, setTitle] = useState("");
   const [artistId, setArtistId] = useState("");
   const [year, setYear] = useState("");
@@ -15,8 +26,6 @@ export default function AlbumsPage() {
   const [editArtistId, setEditArtistId] = useState("");
   const [editYear, setEditYear] = useState("");
 
-  const [q, setQ] = useState("");
-  const [sort, setSort] = useState("year-desc"); // 최신 우선
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -48,17 +57,27 @@ export default function AlbumsPage() {
     loadAll();
   }, []);
 
+  // 🔹 [변경] URL 값을 변경하는 핸들러 함수들
+  const handleSearchChange = (e) => {
+    // 검색어가 바뀌면 URL의 q 파라미터 업데이트 (sort는 유지)
+    setSearchParams({ q: e.target.value, sort }, { replace: true });
+  };
+
+  const handleSortChange = (e) => {
+    // 정렬이 바뀌면 URL의 sort 파라미터 업데이트 (q는 유지)
+    setSearchParams({ q, sort: e.target.value });
+  };
+
   const sorted = useMemo(() => {
     let data = albums;
     const t = q.trim().toLowerCase();
     if (t) {
-      // 가수 이름으로 필터링
       data = data.filter((a) => {
         const artistName = (artistNameById.get(a.artistId) || "").toLowerCase();
         return artistName.includes(t);
       });
     }
-    const [k, dir] = sort.split("-"); // year-desc / year-asc / title-asc
+    const [k, dir] = sort.split("-");
     return [...data].sort((A, B) => {
       const a = A[k] ?? "";
       const b = B[k] ?? "";
@@ -68,6 +87,7 @@ export default function AlbumsPage() {
     });
   }, [albums, sort, q, artistNameById]);
 
+  // (add, save, remove 함수들은 기존과 동일)
   const add = async (e) => {
     e.preventDefault();
     if (!title.trim() || !artistId) return;
@@ -139,7 +159,7 @@ export default function AlbumsPage() {
             💿 앨범 <span className="badge">{sorted.length}</span>
           </h1>
           <button className="btn ghost" onClick={loadAll} title="새로고침">
-            � 새로고침
+            🔄 새로고침
           </button>
         </div>
 
@@ -148,11 +168,11 @@ export default function AlbumsPage() {
           <div className="search-toolbar">
             <input
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={handleSearchChange} // 🔹 [연결] URL 변경 핸들러
               placeholder="🔍 가수 이름으로 검색..."
               style={{ flex: 1 }}
             />
-            <select value={sort} onChange={(e) => setSort(e.target.value)}>
+            <select value={sort} onChange={handleSortChange}> {/* 🔹 [연결] */}
               <option value="year-desc">📅 연도 (최신순)</option>
               <option value="year-asc">📅 연도 (오래된순)</option>
               <option value="title-asc">📝 제목 (오름차순)</option>
@@ -160,7 +180,7 @@ export default function AlbumsPage() {
             </select>
           </div>
 
-          {/* 추가 폼 */}
+          {/* 추가 폼 (기존 동일) */}
           <form onSubmit={add} className="add-form">
             <input
               value={title}
@@ -204,23 +224,19 @@ export default function AlbumsPage() {
             </button>
           </form>
 
-          {/* 에러 메시지 */}
+          {/* 에러/로딩 메시지 */}
           {error && (
             <div className="error-message">
               <span>❗</span>
               <span>{error}</span>
             </div>
           )}
-
-          {/* 로딩 상태 */}
           {loading && (
             <div className="empty-state">
               <div className="empty-state-icon">⏳</div>
               <div className="empty-state-text">앨범을 불러오는 중...</div>
             </div>
           )}
-
-          {/* 빈 상태 */}
           {!loading && !error && sorted.length === 0 && (
             <div className="empty-state">
               <div className="empty-state-icon">💿</div>
@@ -235,6 +251,7 @@ export default function AlbumsPage() {
                 <div key={a.id} className="item-card">
                   {editId === a.id ? (
                     <div className="edit-form">
+                      {/* 수정 폼 (기존 동일) */}
                       <input
                         value={editTitle}
                         onChange={(e) => setEditTitle(e.target.value)}
@@ -284,6 +301,7 @@ export default function AlbumsPage() {
                       <div className="item-card-header">
                         <h3 className="item-card-title">{a.title}</h3>
                       </div>
+
                       <div className="item-card-meta">
                         <span>🆔 #{a.id}</span>
                         <span>
@@ -291,7 +309,22 @@ export default function AlbumsPage() {
                         </span>
                         <span>📅 {a.year || "—"}</span>
                       </div>
+
                       <div className="item-card-actions">
+                        {/* 🔹 수록곡 버튼 (누르면 이동) */}
+                        <button
+                          className="btn"
+                          style={{
+                            backgroundColor: "#e0e7ff",
+                            color: "#4338ca",
+                            fontWeight: "bold",
+                            border: "none"
+                          }}
+                          onClick={() => navigate(`/album/${a.id}`)}
+                        >
+                          🎵 수록곡
+                        </button>
+
                         <button
                           className="btn ghost"
                           onClick={() => {

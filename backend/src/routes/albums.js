@@ -1,5 +1,5 @@
-// backend/src/routes/albums.js
 import { Router } from "express";
+// 🔹 [중요] 모든 함수를 db 객체로 묶어서 가져와야 기존 코드(db.getAlbums 등)와 호환됩니다.
 import * as db from "../store/db.mysql.js";
 
 const router = Router();
@@ -15,7 +15,6 @@ router.get("/", async (req, res, next) => {
 });
 
 // POST /albums
-// body: { title, artistId, year }
 router.post("/", async (req, res, next) => {
   try {
     const { title, artistId, year } = req.body ?? {};
@@ -36,7 +35,6 @@ router.post("/", async (req, res, next) => {
 });
 
 // PATCH /albums/:id
-// body: { title, artistId, year }
 router.patch("/:id", async (req, res, next) => {
   try {
     const id = Number(req.params.id);
@@ -63,6 +61,32 @@ router.delete("/:id", async (req, res, next) => {
     const id = Number(req.params.id);
     await db.deleteAlbum(id);
     res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 🔹 [추가] 앨범 상세 정보 조회
+router.get("/:id", async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    // db.mysql.js에 추가한 함수 호출
+    const album = await db.getAlbumById(id);
+
+    if (!album) return res.status(404).json({ error: "Album not found" });
+    res.json(album);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 🔹 [추가] 앨범 수록곡 목록 조회
+router.get("/:id/tracks", async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    // db.mysql.js에 추가한 함수 호출
+    const tracks = await db.getAlbumTracks(id);
+    res.json(tracks);
   } catch (err) {
     next(err);
   }
