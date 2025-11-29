@@ -10,12 +10,13 @@ dotenv.config();
  * - albums(album_id, title, title_norm, artist_main_id, created_at)
  * - songs(song_id, title, title_norm, album_id, is_collab, play_count, created_at)
  * - song_artists(song_id, artist_id, display_order, created_at)
- * - playlists(playlist_id, user_id, name, is_public, created_at, updated_at)
+ * - playlists(playlist_id, user_id, name, is_public, created_at, updated_at, note)
  * - playlist_items(item_id, playlist_id, song_id, position, note, added_at)
  * - charts(chart_id, chart_type, year, week, rank, song_id, week_start_date, week_end_date)
  * - follows(follower_id, following_id, target_type, created_at)
  * - play_history(history_id, user_id, song_id, played_at)
  * - users(user_id, email, password_hash, nickname, created_at, last_login_at)
+ * - likes(like_id, user_id, song_id, created_at)
  */
 
 // === Artists ===
@@ -98,17 +99,102 @@ export { pool };
 // Artists
 // --------------------------------------------------------------------
 
-// GET /artists
+// 🔥 확장된 Artists 목록 (팔로워 수, 차트 집계, 대표곡, 곡 좋아요 기반)
 export async function getArtists() {
   const [rows] = await pool.query(
     `
+    WITH song_stats AS (
+      SELECT
+        s.${SONG_ID_COL}                AS song_id,
+        s.${SONG_TITLE_COL}             AS title,
+        sa.${SA_ARTIST_ID_COL}          AS artist_id,
+        COALESCE(l.total_likes, 0)      AS total_likes,
+        COALESCE(c.weeks_on_chart, 0)   AS weeks_on_chart,
+        ROW_NUMBER() OVER (
+          PARTITION BY sa.${SA_ARTIST_ID_COL}
+          ORDER BY
+            COALESCE(l.total_likes, 0)    DESC,  -- 1순위: 좋아요 많은 순
+            COALESCE(c.weeks_on_chart, 0) DESC,  -- 2순위: 차트 주 수 많은 순
+            s.${SONG_ID_COL}             ASC    -- 3순위: song_id 작은 순
+        ) AS rn
+      FROM ${SONGS_TABLE} s
+      JOIN ${SONG_ARTISTS_TABLE} sa
+        ON sa.${SA_SONG_ID_COL} = s.${SONG_ID_COL}
+       AND (sa.${SA_DISPLAY_ORDER_COL} = 1 OR sa.${SA_DISPLAY_ORDER_COL} IS NULL)
+
+      -- 곡별 총 좋아요 수
+      LEFT JOIN (
+        SELECT
+          song_id,
+          COUNT(DISTINCT like_id) AS total_likes
+        FROM likes
+        GROUP BY song_id
+      ) l
+        ON l.song_id = s.${SONG_ID_COL}
+
+      -- 곡별 차트 인 주 수
+      LEFT JOIN (
+        SELECT
+          song_id,
+          COUNT(*) AS weeks_on_chart
+        FROM ${CHARTS_TABLE}
+        GROUP BY song_id
+      ) c
+        ON c.song_id = s.${SONG_ID_COL}
+    )
+
     SELECT
-      ${ARTIST_ID_COL}   AS id,
-      ${ARTIST_NAME_COL} AS name
-    FROM ${ARTISTS_TABLE}
-    ORDER BY ${ARTIST_ID_COL} DESC
+      a.${ARTIST_ID_COL}         AS id,
+      a.${ARTIST_NAME_COL}       AS name,
+
+      -- 팔로워 수
+      COALESCE(f.followers, 0)   AS followCount,
+
+      -- 아티스트 전체 차트 인 주 수, TOP10 진입 횟수
+      COALESCE(ca.chart_weeks, 0)       AS chartWeeks,
+      COALESCE(ca.top10_appearances, 0) AS top10Appearances,
+
+      -- 대표곡 제목
+      ss.title                   AS repSongTitle
+
+    FROM ${ARTISTS_TABLE} a
+
+    -- 아티스트별 차트 집계 (주 수 / TOP10 횟수)
+    LEFT JOIN (
+      SELECT
+        sa.${SA_ARTIST_ID_COL} AS artist_id,
+        COUNT(DISTINCT CONCAT(c.year, '-', c.week)) AS chart_weeks,
+        SUM(CASE WHEN c.rank <= 10 THEN 1 ELSE 0 END) AS top10_appearances
+      FROM ${CHARTS_TABLE} c
+      JOIN ${SONGS_TABLE} s
+        ON s.${SONG_ID_COL} = c.song_id
+      JOIN ${SONG_ARTISTS_TABLE} sa
+        ON sa.${SA_SONG_ID_COL} = s.${SONG_ID_COL}
+       AND (sa.${SA_DISPLAY_ORDER_COL} = 1 OR sa.${SA_DISPLAY_ORDER_COL} IS NULL)
+      GROUP BY sa.${SA_ARTIST_ID_COL}
+    ) ca
+      ON ca.artist_id = a.${ARTIST_ID_COL}
+
+    -- 아티스트 팔로워 수
+    LEFT JOIN (
+      SELECT
+        following_id,
+        COUNT(DISTINCT follower_id) AS followers
+      FROM ${FOLLOWS_TABLE}
+      WHERE target_type = 'artist'
+      GROUP BY following_id
+    ) f
+      ON f.following_id = a.${ARTIST_ID_COL}
+
+    -- 대표곡(아티스트별 1위 곡) 조인
+    LEFT JOIN song_stats ss
+      ON ss.artist_id = a.${ARTIST_ID_COL}
+     AND ss.rn = 1
+
+    ORDER BY a.${ARTIST_ID_COL} DESC
     `
   );
+
   return rows;
 }
 
@@ -163,19 +249,24 @@ export async function deleteArtist(id) {
 // Albums
 // --------------------------------------------------------------------
 
-// GET /albums  (YEAR(created_at)를 year로 사용)
+// GET /albums  (YEAR(created_at)를 year로 사용, 아티스트 이름 포함)
 export async function getAlbums() {
   const [rows] = await pool.query(
     `
     SELECT
-      ${ALBUM_ID_COL}        AS id,
-      ${ALBUM_TITLE_COL}     AS title,
-      ${ALBUM_ARTIST_ID_COL} AS artistId,
-      YEAR(${ALBUM_CREATED_AT_COL}) AS year
-    FROM ${ALBUMS_TABLE}
-    ORDER BY ${ALBUM_ID_COL} DESC
+      al.${ALBUM_ID_COL}     AS id,
+      al.${ALBUM_TITLE_COL}  AS title,
+      al.${ALBUM_CREATED_AT_COL} AS created_at,
+      al.${ALBUM_ARTIST_ID_COL} AS artistId,
+      ar.${ARTIST_NAME_COL}  AS artist_name,
+      YEAR(al.${ALBUM_CREATED_AT_COL}) AS year
+    FROM ${ALBUMS_TABLE} al
+    LEFT JOIN ${ARTISTS_TABLE} ar
+      ON ar.${ARTIST_ID_COL} = al.${ALBUM_ARTIST_ID_COL}
+    ORDER BY al.${ALBUM_CREATED_AT_COL} DESC, al.${ALBUM_ID_COL} DESC
     `
   );
+
   return rows;
 }
 
@@ -233,42 +324,67 @@ export async function deleteAlbum(id) {
 // Songs (+ song_artists 로 메인 아티스트 연결)
 // --------------------------------------------------------------------
 
+// 🔥 확장된 GET /songs (좋아요/유저 좋아요 여부 + artistName 포함)
 // GET /songs 또는 /songs?artistId=...&q=...
-export async function getSongs({ artistId, q } = {}) {
+export async function getSongs({ artistId, q, userId } = {}) {
   const params = [];
   const where = [];
 
-  let query = `
-    SELECT 
-      s.${SONG_ID_COL}    AS id,
-      s.${SONG_TITLE_COL} AS title,
-      
-      (SELECT name FROM ${ARTISTS_TABLE} a 
-       JOIN ${SONG_ARTISTS_TABLE} sa_main ON a.${ARTIST_ID_COL} = sa_main.${SA_ARTIST_ID_COL}
-       WHERE sa_main.${SA_SONG_ID_COL} = s.${SONG_ID_COL} 
-       ORDER BY sa_main.${SA_DISPLAY_ORDER_COL} ASC LIMIT 1) AS artistName
+  // 1번째 파라미터: 현재 로그인 유저 id (없으면 null)
+  params.push(userId ?? null);
 
-    FROM ${SONGS_TABLE} s
-  `;
-
+  // 아티스트 기준 필터
   if (artistId) {
-    query += ` JOIN ${SONG_ARTISTS_TABLE} sa_filter ON s.${SONG_ID_COL} = sa_filter.${SA_SONG_ID_COL} `;
-    where.push(`sa_filter.${SA_ARTIST_ID_COL} = ?`);
+    where.push(`sa.${SA_ARTIST_ID_COL} = ?`);
     params.push(artistId);
   }
 
+  // 제목 검색 (title_norm 사용, 소문자로 비교)
   if (q) {
     where.push(`s.title_norm LIKE ?`);
     params.push(`%${q.toLowerCase()}%`);
   }
 
-  if (where.length > 0) {
-    query += ` WHERE ${where.join(" AND ")} `;
-  }
+  const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-  query += ` ORDER BY s.${SONG_ID_COL} DESC`;
+  const [rows] = await pool.query(
+    `
+    SELECT
+      s.${SONG_ID_COL}              AS id,
+      s.${SONG_TITLE_COL}           AS title,
+      sa.${SA_ARTIST_ID_COL}        AS artistId,
+      a.${ARTIST_NAME_COL}          AS artistName,
 
-  const [rows] = await pool.query(query, params);
+      -- 곡별 총 좋아요 수
+      COALESCE(COUNT(DISTINCT l.like_id), 0) AS total_likes,
+
+      -- 현재 유저가 좋아요 눌렀는지 (0/1)
+      MAX(CASE WHEN l.user_id = ? THEN 1 ELSE 0 END) AS user_liked
+
+    FROM ${SONGS_TABLE} s
+    LEFT JOIN ${SONG_ARTISTS_TABLE} sa
+      ON s.${SONG_ID_COL} = sa.${SA_SONG_ID_COL}
+     AND (sa.${SA_DISPLAY_ORDER_COL} = 1 OR sa.${SA_DISPLAY_ORDER_COL} IS NULL)
+
+    LEFT JOIN ${ARTISTS_TABLE} a
+      ON a.${ARTIST_ID_COL} = sa.${SA_ARTIST_ID_COL}
+
+    LEFT JOIN likes l
+      ON l.song_id = s.${SONG_ID_COL}
+
+    ${whereClause}
+
+    GROUP BY
+      s.${SONG_ID_COL},
+      s.${SONG_TITLE_COL},
+      sa.${SA_ARTIST_ID_COL},
+      a.${ARTIST_NAME_COL}
+
+    ORDER BY s.${SONG_ID_COL} DESC
+    `,
+    params
+  );
+
   return rows;
 }
 
@@ -405,27 +521,39 @@ export async function deleteSong(id) {
 // Playlists
 // --------------------------------------------------------------------
 
-
-// GET /playlists  → 내 플레이리스트
+// GET /playlists  → 내 플레이리스트 (노트 포함, 곡 수 포함)
 export async function getPlaylists(userId) {
   const [rows] = await pool.query(
     `
     SELECT
-      ${PLAYLIST_ID_COL}   AS id,
-      ${PLAYLIST_NAME_COL} AS name,
-      ${PLAYLIST_IS_PUBLIC_COL} AS isPublic,
-      note                 AS note
-    FROM ${PLAYLISTS_TABLE}
-    WHERE ${PLAYLIST_USER_ID_COL} = ?
-    ORDER BY ${PLAYLIST_ID_COL} DESC
+      p.${PLAYLIST_ID_COL}          AS id,
+      p.${PLAYLIST_USER_ID_COL}     AS user_id,
+      p.${PLAYLIST_NAME_COL}        AS name,
+      p.${PLAYLIST_IS_PUBLIC_COL}   AS isPublic,
+      p.note                        AS note,
+      p.created_at                  AS created_at,
+      p.updated_at                  AS updated_at,
+      COUNT(pi.${ITEM_ID_COL})      AS song_count
+    FROM ${PLAYLISTS_TABLE} p
+    LEFT JOIN ${PLAYLIST_ITEMS_TABLE} pi
+      ON pi.${ITEM_PLAYLIST_ID_COL} = p.${PLAYLIST_ID_COL}
+    WHERE p.${PLAYLIST_USER_ID_COL} = ?
+    GROUP BY p.${PLAYLIST_ID_COL}
+    ORDER BY p.created_at DESC, p.${PLAYLIST_ID_COL} DESC
     `,
     [userId]
   );
+
   return rows;
 }
 
 // POST /playlists
-export async function createPlaylist({ userId, name, isPublic = true, note = "" }) {
+export async function createPlaylist({
+  userId,
+  name,
+  isPublic = true,
+  note = "",
+}) {
   const [result] = await pool.query(
     `
     INSERT INTO ${PLAYLISTS_TABLE}
@@ -460,8 +588,9 @@ export async function updatePlaylist(id, { name, note, isPublic }) {
   return { id, name, note, isPublic };
 }
 
-// 제목/가수 이름으로 검색 (플레이리스트 검색에서 사용)
-export async function searchSongs({ q }) {
+// 제목/가수 이름으로 검색 (플레이리스트/검색 페이지에서 사용)
+// 🔥 두 버전 합친 것: 제목 + 아티스트 이름 검색, 앨범 제목도 포함
+export async function searchSongs({ q, userId } = {}) {
   const like = `%${q}%`;
 
   const [rows] = await pool.query(
@@ -469,18 +598,23 @@ export async function searchSongs({ q }) {
     SELECT
       s.song_id AS id,
       s.title,
+      -- 아티스트 이름(대표/공동 포함)
       GROUP_CONCAT(
         DISTINCT a.name
         ORDER BY sa.display_order
         SEPARATOR ', '
-      ) AS artistName
+      ) AS artistName,
+      -- 앨범 제목
+      al.title AS album_title
     FROM songs AS s
+    LEFT JOIN albums AS al
+      ON al.album_id = s.album_id
     LEFT JOIN song_artists AS sa
       ON sa.song_id = s.song_id
     LEFT JOIN artists AS a
       ON a.artist_id = sa.artist_id
     WHERE s.title LIKE ? OR a.name LIKE ?
-    GROUP BY s.song_id, s.title
+    GROUP BY s.song_id, s.title, al.title
     ORDER BY s.song_id ASC
     `,
     [like, like]
@@ -489,7 +623,61 @@ export async function searchSongs({ q }) {
   return rows;
 }
 
+// 🔍 아티스트 검색
+export async function searchArtists({ q }) {
+  const like = `%${q}%`;
 
+  const [rows] = await pool.query(
+    `
+    SELECT
+      a.artist_id AS id,
+      a.name      AS name,
+      COALESCE(f.followCount, 0) AS followCount
+    FROM artists a
+    LEFT JOIN (
+      SELECT
+        following_id AS artist_id,
+        COUNT(*)     AS followCount
+      FROM follows
+      WHERE target_type = 'artist'
+      GROUP BY following_id
+    ) f
+      ON f.artist_id = a.artist_id
+    WHERE a.name LIKE ? OR a.name_norm LIKE ?
+    ORDER BY a.name_norm ASC, a.artist_id ASC
+    `,
+    [like, like]
+  );
+
+  return rows;
+}
+
+// 🔍 앨범 검색
+export async function searchAlbums({ q }) {
+  const like = `%${q}%`;
+
+  const [rows] = await pool.query(
+    `
+    SELECT
+      al.${ALBUM_ID_COL}       AS id,
+      al.${ALBUM_TITLE_COL}    AS title,
+      al.${ALBUM_CREATED_AT_COL} AS created_at,
+      al.${ALBUM_ARTIST_ID_COL} AS artistId,
+      ar.${ARTIST_NAME_COL}    AS artist_name,
+      YEAR(al.${ALBUM_CREATED_AT_COL}) AS year
+    FROM ${ALBUMS_TABLE} al
+    LEFT JOIN ${ARTISTS_TABLE} ar
+      ON ar.${ARTIST_ID_COL} = al.${ALBUM_ARTIST_ID_COL}
+    WHERE al.${ALBUM_TITLE_COL} LIKE ? OR ar.${ARTIST_NAME_COL} LIKE ?
+    ORDER BY al.${ALBUM_CREATED_AT_COL} DESC, al.${ALBUM_ID_COL} DESC
+    `,
+    [like, like]
+  );
+
+  return rows;
+}
+
+// 🔥 공개 플레이리스트 검색 (viewerId 기준 내 팔로우 여부 포함)
 export async function searchPublicPlaylists({ q, viewerId }) {
   const params = [];
   let where = `WHERE p.${PLAYLIST_IS_PUBLIC_COL} = 1`;
@@ -500,8 +688,8 @@ export async function searchPublicPlaylists({ q, viewerId }) {
     params.push(like, like);
   }
 
-  // viewerId 파라미터 추가
-  params.push(viewerId);
+  // viewerId param (없으면 null)
+  params.push(viewerId ?? null);
 
   const [rows] = await pool.query(
     `
@@ -542,8 +730,11 @@ export async function searchPublicPlaylists({ q, viewerId }) {
   return rows;
 }
 
-// 팔로우 수 기준 상위 공개 플레이리스트
-export async function getPopularPublicPlaylists({ limit = 50, viewerId } = {}) {
+// 🔥 팔로우 수 기준 상위 공개 플레이리스트 (viewerId 포함)
+export async function getPopularPublicPlaylists({
+  limit = 50,
+  viewerId,
+} = {}) {
   const [rows] = await pool.query(
     `
     SELECT
@@ -577,7 +768,7 @@ export async function getPopularPublicPlaylists({ limit = 50, viewerId } = {}) {
     ORDER BY followerCount DESC, p.${PLAYLIST_ID_COL} DESC
     LIMIT ?
     `,
-    [viewerId, limit]
+    [viewerId ?? null, limit]
   );
 
   return rows;
@@ -619,7 +810,6 @@ export async function deletePlaylist(id) {
 // --------------------------------------------------------------------
 
 // GET /playlists/:id/items
-
 export async function getPlaylistItems(playlistId) {
   const [rows] = await pool.query(
     `
@@ -630,7 +820,7 @@ export async function getPlaylistItems(playlistId) {
         pi.position,
         pi.added_at,
         s.title                                                        AS songTitle,
-        -- 🔽 가수 이름 (여러 명이면 ', '로 합치기)
+        -- 가수 이름 (여러 명이면 ', '로 합치기)
         GROUP_CONCAT(DISTINCT a.name ORDER BY sa.display_order SEPARATOR ', ')
           AS artistName
       FROM playlist_items AS pi
@@ -714,7 +904,6 @@ export async function deletePlaylistItem(id) {
 
 // GET /charts
 export async function getCharts() {
-  // 1) SQL은 그냥 * 으로 다 가져오고
   const [rows] = await pool.query(
     `
     SELECT *
@@ -723,7 +912,6 @@ export async function getCharts() {
     `
   );
 
-  // 2) 자바스크립트 쪽에서 필요한 이름으로 바꿔서 리턴
   return rows.map((row) => ({
     id: row.chart_id,
     chartType: row.chart_type,
@@ -736,7 +924,7 @@ export async function getCharts() {
   }));
 }
 
-// GET /songs/:id/charts - 특정 노래의 차트 기록
+// GET /songs/:id/charts - 특정 노래의 차트 기록 (chartRank alias 사용)
 export async function getSongCharts(songId) {
   const [rows] = await pool.query(
     `
@@ -761,7 +949,6 @@ export async function getSongCharts(songId) {
 // GET /songs/:id/recommendations - 특정 노래와 같은 차트 기간에 올랐던 곡들 추천
 export async function getRecommendedSongs(songId) {
   try {
-    // 1) 해당 곡이 올랐던 차트 기간들 조회
     const [chartPeriods] = await pool.query(
       `
       SELECT DISTINCT year, week
@@ -776,13 +963,14 @@ export async function getRecommendedSongs(songId) {
       return [];
     }
 
-    // 2) 같은 차트 기간에 올랐던 다른 곡들 조회
-    const placeholders = chartPeriods.map(() => "(c.year = ? AND c.week = ?)").join(" OR ");
+    const placeholders = chartPeriods
+      .map(() => "(c.year = ? AND c.week = ?)")
+      .join(" OR ");
     const params = [];
     chartPeriods.forEach((period) => {
       params.push(period.year, period.week);
     });
-    params.push(songId); // WHERE song_id != ?
+    params.push(songId);
 
     const [recommendedRows] = await pool.query(
       `
@@ -839,10 +1027,10 @@ export async function getPopularSongs(limit = 10) {
 }
 
 // --------------------------------------------------------------------
-// Follows  (READ-ONLY 목록용)
+// Follows
 // --------------------------------------------------------------------
 
-// GET /follows
+// GET /follows (단순 전체 목록)
 export async function getFollows() {
   const [rows] = await pool.query(`
     SELECT follower_id AS followerId, following_id AS followingId, created_at AS createdAt
@@ -904,6 +1092,7 @@ export async function deleteFollow(followerId, followingId, targetType) {
   return result.affectedRows > 0;
 }
 
+// 🔥 내 팔로우 목록 (user / artist / playlist + playlist owner_id 포함)
 export async function getMyFollows(followerId) {
   const query = `
     SELECT 
@@ -916,7 +1105,7 @@ export async function getMyFollows(followerId) {
         WHEN f.target_type = 'playlist' THEN p.name 
       END AS target_name,
       
-      -- 🔹 플레이리스트일 경우 작성자(owner) ID가 필요함 (클릭 시 이동 위해)
+      -- 플레이리스트일 경우 작성자(owner) ID
       CASE
         WHEN f.target_type = 'playlist' THEN p.user_id
         ELSE NULL
@@ -933,7 +1122,7 @@ export async function getMyFollows(followerId) {
   return rows;
 }
 
-// 추천 목록
+// 추천 목록 (간단)
 export async function getRecommendations(myEmail) {
   const [users] = await pool.query(
     "SELECT user_id AS userId, nickname, email FROM users WHERE email != ? ORDER BY created_at DESC LIMIT 5",
@@ -944,8 +1133,6 @@ export async function getRecommendations(myEmail) {
   );
   return { users, artists };
 }
-
-// [backend/src/store/db.mysql.js] 맨 아래에 추가
 
 // 🔍 팔로우 대상 검색 (유저+아티스트)
 export async function searchFollowTargets(keyword) {
@@ -968,6 +1155,60 @@ export async function searchFollowTargets(keyword) {
   );
 
   return [...users, ...artists];
+}
+
+// === 플레이리스트 팔로우 여부 체크 ===
+export async function checkFollow(followerId, followingId, targetType) {
+  const [rows] = await pool.query(
+    "SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ? AND target_type = ?",
+    [followerId, followingId, targetType]
+  );
+  return rows.length > 0;
+}
+
+// === 특정 유저의 공개 플레이리스트 조회 (UserPage용) ===
+export async function getPublicPlaylistsByUserId(userId, viewerId) {
+  const [rows] = await pool.query(
+    `
+    SELECT
+      p.${PLAYLIST_ID_COL}      AS id,
+      p.${PLAYLIST_NAME_COL}    AS name,
+      p.note                    AS note,
+      u.nickname                AS ownerNickname,
+      COUNT(DISTINCT pi.${ITEM_ID_COL}) AS trackCount,
+      COALESCE(f.followers, 0)  AS followerCount,
+      
+      -- 내가 팔로우했는지 여부
+      MAX(CASE WHEN my_f.follower_id IS NOT NULL THEN 1 ELSE 0 END) AS isFollowed
+
+    FROM ${PLAYLISTS_TABLE} p
+    JOIN ${USERS_TABLE} u ON u.${USER_ID_COL} = p.${PLAYLIST_USER_ID_COL}
+    LEFT JOIN ${PLAYLIST_ITEMS_TABLE} pi ON pi.${ITEM_PLAYLIST_ID_COL} = p.${PLAYLIST_ID_COL}
+    LEFT JOIN (
+      SELECT following_id, COUNT(*) as followers
+      FROM follows WHERE target_type = 'playlist' GROUP BY following_id
+    ) f ON f.following_id = p.${PLAYLIST_ID_COL}
+    
+    LEFT JOIN follows my_f 
+      ON my_f.following_id = p.${PLAYLIST_ID_COL} 
+      AND my_f.follower_id = ? 
+      AND my_f.target_type = 'playlist'
+
+    WHERE p.${PLAYLIST_USER_ID_COL} = ? AND p.${PLAYLIST_IS_PUBLIC_COL} = 1
+    GROUP BY p.${PLAYLIST_ID_COL}
+    ORDER BY p.${PLAYLIST_ID_COL} DESC
+    `,
+    [viewerId ?? null, userId]
+  );
+  return rows;
+}
+
+export async function getPlaylistOwnerId(playlistId) {
+  const [rows] = await pool.query(
+    `SELECT ${PLAYLIST_USER_ID_COL} AS userId FROM ${PLAYLISTS_TABLE} WHERE ${PLAYLIST_ID_COL} = ?`,
+    [playlistId]
+  );
+  return rows[0]?.userId || null;
 }
 
 // --------------------------------------------------------------------
@@ -995,13 +1236,11 @@ export async function addPlayHistory(userId, songId) {
   try {
     await conn.beginTransaction();
 
-    // 기록 저장
     await conn.query(
       "INSERT INTO play_history (user_id, song_id) VALUES (?, ?)",
       [userId, songId]
     );
 
-    // 조회수 증가
     await conn.query(
       "UPDATE songs SET play_count = play_count + 1 WHERE song_id = ?",
       [songId]
@@ -1038,7 +1277,7 @@ export async function getMyPlayHistory(userId) {
 }
 
 // --------------------------------------------------------------------
-// Users (READ-ONLY)
+// Users
 // --------------------------------------------------------------------
 
 // GET /users
@@ -1075,7 +1314,6 @@ export async function updateUser(userId, { nickname }) {
     throw new Error("User not found");
   }
 
-  // 업데이트된 사용자 정보 반환
   const [rows] = await pool.query(
     `
     SELECT
@@ -1129,60 +1367,9 @@ export async function getUserPasswordHash(userId) {
   return rows[0].password_hash;
 }
 
-// === 플레이리스트 팔로우 여부 체크 ===
-export async function checkFollow(followerId, followingId, targetType) {
-  const [rows] = await pool.query(
-    "SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ? AND target_type = ?",
-    [followerId, followingId, targetType]
-  );
-  return rows.length > 0;
-}
-
-// === 특정 유저의 공개 플레이리스트 조회 (UserPage용) ===
-export async function getPublicPlaylistsByUserId(userId, viewerId) {
-  const [rows] = await pool.query(
-    `
-    SELECT
-      p.${PLAYLIST_ID_COL}      AS id,
-      p.${PLAYLIST_NAME_COL}    AS name,
-      p.note                    AS note,
-      u.nickname                AS ownerNickname,
-      COUNT(DISTINCT pi.${ITEM_ID_COL}) AS trackCount,
-      COALESCE(f.followers, 0)  AS followerCount,
-      
-      -- 🔹 [추가] 내가 팔로우했는지 여부 (1이면 true, 0이면 false)
-      MAX(CASE WHEN my_f.follower_id IS NOT NULL THEN 1 ELSE 0 END) AS isFollowed
-
-    FROM ${PLAYLISTS_TABLE} p
-    JOIN ${USERS_TABLE} u ON u.${USER_ID_COL} = p.${PLAYLIST_USER_ID_COL}
-    LEFT JOIN ${PLAYLIST_ITEMS_TABLE} pi ON pi.${ITEM_PLAYLIST_ID_COL} = p.${PLAYLIST_ID_COL}
-    LEFT JOIN (
-      SELECT following_id, COUNT(*) as followers
-      FROM follows WHERE target_type = 'playlist' GROUP BY following_id
-    ) f ON f.following_id = p.${PLAYLIST_ID_COL}
-    
-    -- 🔹 [추가] 내 팔로우 정보 확인용 조인
-    LEFT JOIN follows my_f 
-      ON my_f.following_id = p.${PLAYLIST_ID_COL} 
-      AND my_f.follower_id = ? 
-      AND my_f.target_type = 'playlist'
-
-    WHERE p.${PLAYLIST_USER_ID_COL} = ? AND p.${PLAYLIST_IS_PUBLIC_COL} = 1
-    GROUP BY p.${PLAYLIST_ID_COL}
-    ORDER BY p.${PLAYLIST_ID_COL} DESC
-    `,
-    [viewerId, userId]
-  );
-  return rows;
-}
-
-export async function getPlaylistOwnerId(playlistId) {
-  const [rows] = await pool.query(
-    `SELECT ${PLAYLIST_USER_ID_COL} AS userId FROM ${PLAYLISTS_TABLE} WHERE ${PLAYLIST_ID_COL} = ?`,
-    [playlistId]
-  );
-  return rows[0]?.userId || null;
-}
+// --------------------------------------------------------------------
+// Album 상세용 (상세 페이지)
+// --------------------------------------------------------------------
 
 // 1. 앨범 상세 정보 조회 (제목, 가수명, 연도 등)
 export async function getAlbumById(albumId) {
@@ -1209,12 +1396,11 @@ export async function getAlbumTracks(albumId) {
     SELECT 
       s.${SONG_ID_COL}    AS id,
       s.${SONG_TITLE_COL} AS title,
-      -- 가수 이름 (피처링 포함)
       (SELECT GROUP_CONCAT(a.name SEPARATOR ', ')
-      FROM ${SONG_ARTISTS_TABLE} sa
-      JOIN ${ARTISTS_TABLE} a ON sa.${SA_ARTIST_ID_COL} = a.${ARTIST_ID_COL}
-      WHERE sa.${SA_SONG_ID_COL} = s.${SONG_ID_COL}
-      ORDER BY sa.${SA_DISPLAY_ORDER_COL} ASC) AS artistName
+       FROM ${SONG_ARTISTS_TABLE} sa
+       JOIN ${ARTISTS_TABLE} a ON sa.${SA_ARTIST_ID_COL} = a.${ARTIST_ID_COL}
+       WHERE sa.${SA_SONG_ID_COL} = s.${SONG_ID_COL}
+       ORDER BY sa.${SA_DISPLAY_ORDER_COL} ASC) AS artistName
     FROM ${SONGS_TABLE} s
     WHERE s.${SONG_ALBUM_ID_COL} = ?
     ORDER BY s.${SONG_ID_COL} ASC

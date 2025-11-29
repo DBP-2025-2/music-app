@@ -4,6 +4,18 @@ import * as db from "../store/db.mysql.js";
 
 const router = Router();
 
+router.get("/search", async (req, res, next) => {
+  try {
+    const q = (req.query.q || "").toString().trim();
+    if (!q) return res.json({ artists: [] });
+
+    const artists = await db.searchArtists({ q });
+    res.json({ artists });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /artists
 router.get("/", async (req, res, next) => {
   try {

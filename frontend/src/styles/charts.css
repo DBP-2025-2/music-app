@@ -1,0 +1,531 @@
+/* frontend/src/styles/charts.css */
+/* ==================== charts page ==================== */
+
+.charts-page {
+  padding: 32px 56px 48px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.charts-header-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.charts-title {
+  font-size: 0px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 4px;
+}
+
+.charts-subtitle {
+  font-size: 14px;
+  color: rgba(80, 71, 197, 0.8);
+}
+
+.charts-date-range {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.charts-filters {
+  display: flex;
+  gap: 8px;
+}
+
+.charts-select {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 6px 16px;
+  background: rgba(16, 24, 40, 0.7);
+  color: #ffffff;
+  font-size: 13px;
+  outline: none;
+}
+
+.charts-select::placeholder {
+  color: rgb(204, 204, 204);  /* 원하는 밝기 조절 가능 */
+}
+
+
+.charts-select:focus {
+  border-color: #a855f7;
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.5);
+}
+
+/* 카드 */
+
+.charts-card {
+  max-width: 1400px;
+  margin: 0 auto;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 24px 32px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.charts-error {
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #e11d48;
+}
+
+.charts-loading {
+  padding: 40px 0;
+  text-align: center;
+  color: #6b7280;
+}
+
+/* 헤더 라인 */
+
+.charts-table-header {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 2.5fr) minmax(0, 1.6fr) minmax(0, 2fr) 90px 90px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.charts-table-body {
+  margin-top: 4px;
+}
+
+/* 각 행 */
+
+.charts-row {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 2.5fr) minmax(0, 1.6fr) minmax(0, 2fr) 90px 90px;
+  align-items: center;
+  padding: 10px 12px;
+  column-gap: 12px;
+  font-size: 14px;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.charts-row:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(168, 85, 247, 0.06),
+    rgba(236, 72, 153, 0.02)
+  );
+}
+
+/* ===== 연도 타임라인 ===== */
+.charts-year-timeline {
+  position: relative;
+  margin: 80px auto 10px;
+  max-width: 4000px;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 20px;
+}
+.charts-year-timeline-header {
+  margin-bottom: 1px;
+}
+
+.charts-year-line {
+  position: absolute;
+  left: 40px;
+  right: 40px;
+  top: 10px;
+  height: 2px;
+  background: linear-gradient(to right, #e2e2ff, #f0e4ff);
+  z-index: 0;
+}
+
+.year-timeline-item {
+  position: relative;
+  z-index: 1;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #9ca3af;
+  font-size: 12px;
+  margin-right: 10px;
+}
+
+.year-timeline-item:focus {
+  outline: none;
+}
+
+.year-timeline-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #a855f7;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+}
+
+.year-timeline-item--active .year-timeline-dot {
+  background: radial-gradient(circle at 30% 30%, #f97316, #a855f7);
+  border-color: transparent;
+}
+
+.year-timeline-label {
+  font-weight: 500;
+}
+
+.year-timeline-item--active .year-timeline-label {
+  color: #7c3aed;
+}
+
+/* ===== 페이지네이션 ===== */
+.charts-pagination {
+  margin-top: 18px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+}
+
+.charts-page-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #e0e7ff, #f5e1ff);
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(148, 163, 184, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.charts-page-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(148, 163, 184, 0.3);
+}
+
+.charts-page-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+
+.charts-page-info {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* 컬럼 공통 */
+
+.col-rank {
+  font-weight: 600;
+  color: #4b5563;
+  text-align: center;
+}
+
+.col-title {
+  overflow: hidden;
+}
+
+.col-artist,
+.col-album {
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.song-title {
+  font-weight: 500;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.song-artist {
+  font-size: 13px;
+}
+
+.song-album {
+  font-size: 13px;
+}
+
+/* 좋아요 버튼 */
+
+.col-like,
+.col-playlist {
+  display: flex;
+  justify-content: center;
+}
+
+.like-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: none;
+  background: #f5f3ff;
+  font-size: 10px;
+  color: #6b21a8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.like-button:hover {
+  background: #ede9fe;
+}
+
+.like-button--active {
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  color: #ffffff;
+}
+
+.like-count {
+  min-width: 30px;
+  text-align: center;
+}
+
+/* 플리 추가 버튼 */
+
+.playlist-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 16px rgba(168, 85, 247, 0.35);
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.playlist-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(168, 85, 247, 0.45);
+}
+
+/* 빈 상태 */
+
+.charts-empty {
+  padding: 32px 0;
+  text-align: center;
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+/* Chart 페이지 상단 타이틀 */
+.chart-hero-title {
+  width: 100%;
+  text-align: center;
+  margin: 200px 0 10px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.chart-hero-title h1 {
+  font-size: 90px;
+  font-weight: 800;
+  background: linear-gradient(90deg, #A06BFF 0%, #6C52FF 50%, #A06BFF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+/* Top 10 강조 */
+.charts-row--top10 {
+  background: linear-gradient(
+    90deg,
+    rgba(129, 140, 248, 0.16),
+    rgba(236, 72, 153, 0.08)
+  );
+}
+
+.charts-row--top10:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(129, 140, 248, 0.22),
+    rgba(236, 72, 153, 0.12)
+  );
+}
+
+/* 좋아요 버튼 (중복 정의지만 그대로 유지) */
+.like-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: #f5f3ff;
+  color: #6b21a8;
+  transition: background 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.like-button--active {
+  background: linear-gradient(90deg, #f97373, #fb3c8d);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(248, 113, 113, 0.4);
+}
+
+.like-button:hover {
+  transform: translateY(-1px);
+}
+
+.like-count {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* 연도별 → 주간차트로 돌아가는 보라색 화살표 버튼 */
+.charts-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+
+  padding: 6px 14px;
+  border-radius: 999px;
+
+  background: rgba(124, 77, 255, 0.1);
+  border: 1px solid #7c4dff;
+  color: #7c4dff;
+
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+/* 앞에 보라색 동그라미 화살표 아이콘 */
+.charts-back-btn::before {
+  content: "←";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+
+  background: #7c4dff;
+  color: #ffffff;
+  font-size: 0.7rem;
+}
+
+/* 호버 시 살짝 떠오르는 느낌 */
+.charts-back-btn:hover {
+  background: rgba(124, 77, 255, 0.18);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(124, 77, 255, 0.25);
+}
+
+/* 클릭 시 */
+.charts-back-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* ===== 플레이리스트 선택 모달 (ChartsPage) ===== */
+
+.playlist-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.playlist-modal {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 20px 22px 18px;
+  box-shadow: 0 22px 45px rgba(15, 23, 42, 0.5);
+  min-width: 320px;
+  max-width: 420px;
+}
+
+.playlist-modal-title {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.playlist-modal-list {
+  list-style: none;
+  margin: 8px 0 12px;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.playlist-modal-item {
+  margin-bottom: 6px;
+}
+
+.playlist-modal-item button {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f9fafb;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.playlist-modal-item button:hover {
+  background: #eef2ff;
+  transform: translateY(-1px);
+}
+
+.playlist-modal-name {
+  font-weight: 500;
+  color: #111827;
+}
+
+.playlist-modal-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.playlist-modal-badge--public {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.playlist-modal-badge--private {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.playlist-modal-close {
+  margin-top: 8px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 13px;
+  cursor: pointer;
+}

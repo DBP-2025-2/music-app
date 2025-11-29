@@ -1,0 +1,368 @@
+/* ========== 기본 레이아웃 (다른 페이지와 충돌 안 나게 유지) ========== */
+
+.main-page {
+  padding-top: 8px;
+}
+
+.main-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* 공통 섹션 카드 – global.css 의 .card 와 함께 사용 */
+.main-section {
+  padding: 20px;
+}
+
+/* ---------------------------------------------------------- */
+/* 여기까지는 기존 구조 유지                              */
+/* 아래부터는 .clean-main 이 붙은 메인 페이지에만 적용됨 */
+/* ---------------------------------------------------------- */
+
+/* ---------- 벅스 느낌의 전체 배경 & 레이아웃 ---------- */
+.clean-main {
+  background: #fafafa;
+  padding-top: 20px;
+}
+
+.clean-main .main-container {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* 카드: 흰 배경 + 얇은 보더 + 그림자 제거 */
+.clean-main .main-section {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 22px 26px;
+  border: 1px solid #e5e7eb;
+  box-shadow: none !important;
+}
+
+.clean-main .main-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.clean-main .main-section-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.clean-main .main-link-button {
+  border: none;
+  background: none;
+  color: #6b7280;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.clean-main .main-link-button:hover {
+  background: #f1f5f9;
+}
+
+/* ---------- 최신 앨범 영역 ---------- */
+.clean-main .album-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 18px;
+}
+
+.clean-main .album-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.clean-main .album-cover {
+  position: relative;
+  width: 100%;
+  padding-top: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #e5e7eb;
+}
+
+.clean-main .album-cover-gradient {
+  display: none; /* 그라데이션 제거 */
+}
+
+.clean-main .album-cover-initial {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.clean-main .album-meta {
+  font-size: 12px;
+}
+
+.clean-main .album-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+  color: #111827;
+}
+
+.clean-main .album-artist {
+  color: #6b7280;
+}
+
+/* ---------- 곡 차트 + 오른쪽 패널 2단 ---------- */
+.clean-main .main-grid-2 {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 26px;
+}
+
+/* 곡 차트 테이블 */
+.clean-main .chart-table {
+  width: 100%;
+  font-size: 13px;
+  border-collapse: collapse;
+}
+
+.clean-main .chart-table th {
+  text-align: left;
+  padding-bottom: 8px;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.clean-main .chart-table td {
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.clean-main .chart-table tr:hover {
+  background: #f9fafb;
+}
+
+/* 첫 번째 열(순위) 정렬 */
+.clean-main .chart-table th:first-child,
+.clean-main .chart-table td:first-child {
+  width: 60px;
+  text-align: center;
+}
+
+/* ---------- 오른쪽 내 활동 카드 ---------- */
+.clean-main .main-side {
+  display: flex;
+  flex-direction: column;
+}
+
+.clean-main .main-side-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.clean-main .main-side-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.clean-main .main-side-text {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.clean-main .main-side-block {
+  margin-top: 12px;
+}
+
+.clean-main .main-side-block h4 {
+  font-size: 13px;
+  margin: 0 0 6px;
+}
+
+/* 리스트 */
+.clean-main .main-simple-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.clean-main .main-simple-list li {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 13px;
+}
+
+.clean-main .main-simple-title {
+  font-weight: 500;
+  color: #111827;
+}
+
+.clean-main .main-simple-sub {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.clean-main .main-side-links {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.clean-main .side-link {
+  font-size: 12px;
+  color: #6366f1;
+}
+
+.clean-main .side-link:hover {
+  text-decoration: underline;
+}
+
+/* ---------- 라이브러리 / 기능 바로가기 ---------- */
+.clean-main .shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.clean-main .shortcut-card {
+  border-radius: 10px;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.clean-main .shortcut-card:hover {
+  background: #f9fafb;
+}
+
+.clean-main .shortcut-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.clean-main .shortcut-desc {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* ---------- 인기 아티스트 가로 리스트 ---------- */
+.clean-main .artist-row {
+  display: flex;
+  gap: 18px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.clean-main .artist-row::-webkit-scrollbar {
+  height: 6px;
+}
+
+.clean-main .artist-row::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.6);
+  border-radius: 999px;
+}
+
+.clean-main .artist-card {
+  min-width: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.clean-main .artist-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 999px;
+  background: #ebe5e5;
+
+  /* 중앙 정렬 핵심 */
+  display: flex;
+  align-items: center;       /* 세로 중앙 */
+  justify-content: center;   /* 가로 중앙 */
+  text-align: center;        /* 줄바꿈 후에도 가운데 */
+
+  /* 텍스트 스타일 */
+  font-size: 13px;
+  font-weight: 600;
+  color: #5f5f5f;
+
+  padding: 6px;              /* 줄바꿈 시 여백 필요 */
+  line-height: 1.2;          /* 줄 간격 조금 좁게 */
+  word-break: keep-all;      /* 단어 단위 줄바꿈 */
+  white-space: normal;       /* 줄바꿈 허용 */
+}
+
+
+.clean-main .artist-name {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.clean-main .artist-label {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* ---------- 공통 빈 상태 텍스트 ---------- */
+.clean-main .main-empty-text {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+/* ---------- 반응형 ---------- */
+@media (max-width: 960px) {
+  .clean-main .main-grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.clean-main.content-page {
+  background: linear-gradient(
+      180deg,
+      rgba(133, 49, 112, 0.35) 0%,     /* 밝은 핑크 */
+      rgba(179, 131, 255, 0.28) 35%,    /* 연보라 */
+      rgba(170, 130, 255, 0.22) 65%,    /* 바이올렛 */
+      rgba(109, 22, 109, 0.28) 100%    /* 밝은 퍼플로 마감 */
+    )
+    no-repeat fixed;
+  min-height: 100vh;
+}
+
+.clean-main .content-container {
+  background: transparent !important;
+}
+
+.clean-main .content-container::before,
+.clean-main .content-container::after {
+  display: none !important;
+  content: none !important;
+}

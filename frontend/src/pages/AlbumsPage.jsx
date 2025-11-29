@@ -158,8 +158,8 @@ export default function AlbumsPage() {
           <h1 className="page-title">
             💿 앨범 <span className="badge">{sorted.length}</span>
           </h1>
-          <button className="btn ghost" onClick={loadAll} title="새로고침">
-            🔄 새로고침
+          <button className="btn new" onClick={loadAll} title="새로고침">
+            새로고침
           </button>
         </div>
 

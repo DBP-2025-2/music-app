@@ -34,6 +34,13 @@ export default function SongsPage() {
   const itemsPerPage = 20;
   const [currentPageGroup, setCurrentPageGroup] = useState(1);
 
+  // id → name 매핑 (artistName 없을 때 fallback용)
+  const artistNameById = useMemo(() => {
+    const m = new Map();
+    artists.forEach((a) => m.set(a.id, a.name));
+    return m;
+  }, [artists]);
+
   const loadAll = async () => {
     try {
       setError("");
@@ -42,7 +49,7 @@ export default function SongsPage() {
         fetchJson(
           `${API}/songs${filterArtist ? `?artistId=${filterArtist}` : ""}`
         ),
-        fetchJson(`${API}/artists`),
+        fetchJson(`${API}/artists`)
       ]);
       setSongs(s);
       setArtists(a);
@@ -60,9 +67,73 @@ export default function SongsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterArtist, q, sort]);
 
+  // 추천/인기곡: popular → 실패시 기존 추천 로직 fallback
+  const loadRecommendations = async () => {
+    if (songs.length === 0) return;
+
+    try {
+      setRecommendationsLoading(true);
+      let recs = [];
+
+      // 1차 시도: 인기곡 API
+      try {
+        console.log("🔥 인기곡을 가져옵니다...");
+        const popularSongs = await fetchJson(`${API}/songs/popular?limit=10`);
+        if (popularSongs && popularSongs.length > 0) {
+          console.log(
+            "✅ 인기곡:",
+            popularSongs.map((r) => `${r.title} (${r.artistName})`).join(", ")
+          );
+          recs = popularSongs;
+        }
+      } catch (e) {
+        console.warn("인기곡 API 실패, 추천곡 로직으로 fallback:", e);
+      }
+
+      // 2차 시도: 인기곡이 없으면 기존 추천 로직 사용
+      if (!recs.length) {
+        console.log("📉 인기곡이 없어 추천곡 로직 사용");
+        for (let i = 0; i < Math.min(songs.length, 5); i++) {
+          const songId = songs[i].id;
+          const songTitle = songs[i].title;
+          console.log(`🎵 [${i + 1}] 시도: ID=${songId}, 제목="${songTitle}"`);
+
+          const recsForThisSong = await fetchJson(
+            `${API}/songs/${songId}/recommendations`
+          );
+
+          if (recsForThisSong && recsForThisSong.length > 0) {
+            console.log(
+              `✅ 성공! ${songTitle} 기준 ${recsForThisSong.length}개 추천곡`,
+            );
+            recs = recsForThisSong;
+            break;
+          } else {
+            console.log(`❌ 차트 기록 없음: ${songTitle}`);
+          }
+        }
+      }
+
+      if (recs.length > 0) {
+        console.log(
+          "🎯 최종 추천/인기곡:",
+          recs.map((r) => `${r.title} (${r.artistName})`).join(", ")
+        );
+      }
+      setRecommendations(recs || []);
+    } catch (e) {
+      console.error("❌ 추천/인기곡 로드 에러:", e);
+      setRecommendations([]);
+    } finally {
+      setRecommendationsLoading(false);
+    }
+  };
+
+  // 곡 목록이 바뀔 때마다 추천/인기곡 갱신
   useEffect(() => {
     loadRecommendations();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [songs]);
 
   const add = async (e) => {
     e.preventDefault();
@@ -72,7 +143,7 @@ export default function SongsPage() {
       await fetchJson(`${API}/songs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, artistId: Number(artistId) }),
+        body: JSON.stringify({ title, artistId: Number(artistId) })
       });
       setTitle("");
       setArtistId("");
@@ -93,8 +164,8 @@ export default function SongsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: editTitle,
-          artistId: Number(editArtistId),
-        }),
+          artistId: Number(editArtistId)
+        })
       });
       setEditId(null);
       setEditTitle("");
@@ -126,39 +197,13 @@ export default function SongsPage() {
       await fetchJson(`${API}/play-history`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ song_id: song.id }),
+        body: JSON.stringify({ song_id: song.id })
       });
       alert(`🎵 '${song.title}' 재생 시작!`);
       setPlaying(null);
     } catch (e) {
       alert(e.message || "재생 실패");
       setPlaying(null);
-    }
-  };
-
-  const loadRecommendations = async () => {
-    try {
-      setRecommendationsLoading(true);
-      
-      // 차트 기반 인기곡 바로 로드
-      console.log(`🔥 인기곡을 가져옵니다...`);
-      const popularSongs = await fetchJson(`${API}/songs/popular?limit=10`);
-      
-      if (popularSongs && popularSongs.length > 0) {
-        console.log(`✅ 인기곡 ${popularSongs.length}개 획득`);
-        console.log(
-          `🎯 인기곡 데이터:`,
-          popularSongs.map((r) => `${r.title} (${r.artistName})`).join(", ")
-        );
-        setRecommendations(popularSongs);
-      } else {
-        setRecommendations([]);
-      }
-    } catch (e) {
-      console.error("❌ 인기곡 로드 에러:", e);
-      setRecommendations([]);
-    } finally {
-      setRecommendationsLoading(false);
     }
   };
 
@@ -208,7 +253,7 @@ export default function SongsPage() {
     try {
       await fetchJson(`${API}/playlists/${playlistId}/items`, {
         method: "POST",
-        body: JSON.stringify({ songId: targetSongId }),
+        body: JSON.stringify({ songId: targetSongId })
       });
       alert("플레이리스트에 곡이 추가되었습니다. 🎵");
       setPlaylistModalOpen(false);
@@ -270,22 +315,24 @@ export default function SongsPage() {
           <h1 className="page-title">
             🎶 노래 <span className="badge">{allSongs.length}</span>
           </h1>
-          <button className="btn ghost" onClick={loadAll} title="새로고침">
-            🔄 새로고침
+          <button className="btn new" onClick={loadAll} title="새로고침">
+            새로고침
           </button>
         </div>
 
         <div className="content-panel">
-          {/* 인기곡 섹션 */}
+          {/* 인기/추천 곡 섹션 */}
           <div style={{ marginBottom: 40 }}>
             <h2 style={{ margin: 0, marginBottom: 20 }}>
-              🔥 인기곡 (차트 많이 오른 순)
+              🔥 인기곡 / 추천곡
             </h2>
 
             {recommendationsLoading ? (
               <p style={{ color: "#888" }}>로딩 중...</p>
             ) : recommendations.length === 0 ? (
-              <p style={{ color: "#888" }}>인기곡을 불러올 수 없습니다.</p>
+              <p style={{ color: "#888" }}>
+                인기/추천 곡을 불러올 수 없습니다.
+              </p>
             ) : (
               <div
                 style={{
@@ -293,7 +340,7 @@ export default function SongsPage() {
                   display: "flex",
                   gap: 16,
                   paddingBottom: 12,
-                  scrollBehavior: "smooth",
+                  scrollBehavior: "smooth"
                 }}
               >
                 {recommendations.map((rec) => (
@@ -302,15 +349,20 @@ export default function SongsPage() {
                     className="item-card"
                     style={{
                       minWidth: 220,
-                      flex: "0 0 220px",
+                      flex: "0 0 220px"
                     }}
                   >
                     <div className="item-card-header">
                       <h3 className="item-card-title">{rec.title}</h3>
                     </div>
                     <div className="item-card-meta">
-                      <span>👤 {rec.artistName || "Unknown"}</span>
-                      {rec.chartCount && (
+                      <span>
+                        👤{" "}
+                        {rec.artistName ||
+                          artistNameById.get(rec.artistId) ||
+                          "Unknown"}
+                      </span>
+                      {rec.chartCount != null && (
                         <span>📊 {rec.chartCount}회</span>
                       )}
                     </div>
@@ -451,7 +503,10 @@ export default function SongsPage() {
                         <div className="item-card-meta">
                           <span>🆔 #{s.id}</span>
                           <span>
-                            👤 {s.artistName || "Unknown"}
+                            👤{" "}
+                            {s.artistName ||
+                              artistNameById.get(s.artistId) ||
+                              "Unknown"}
                           </span>
                         </div>
                         <div className="item-card-actions">
@@ -508,7 +563,7 @@ export default function SongsPage() {
                     justifyContent: "center",
                     alignItems: "center",
                     gap: 8,
-                    flexWrap: "wrap",
+                    flexWrap: "wrap"
                   }}
                 >
                   {/* 이전 그룹 버튼 */}
@@ -524,7 +579,7 @@ export default function SongsPage() {
                     ◀ 이전
                   </button>
 
-                  {/* 페이지 번튼들 */}
+                  {/* 페이지 버튼들 */}
                   {pageNumbers.map((page) => (
                     <button
                       key={page}
@@ -534,7 +589,7 @@ export default function SongsPage() {
                       onClick={() => setCurrentPage(page)}
                       style={{
                         padding: "8px 12px",
-                        minWidth: "36px",
+                        minWidth: "36px"
                       }}
                     >
                       {page}
@@ -573,7 +628,7 @@ export default function SongsPage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 1000,
+            zIndex: 1000
           }}
           onClick={handleCloseDetail}
         >
@@ -585,7 +640,7 @@ export default function SongsPage() {
               width: "90%",
               maxHeight: "80vh",
               overflow: "auto",
-              boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+              boxShadow: "0 4px 6px rgba(0,0,0,0.1)"
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -596,7 +651,7 @@ export default function SongsPage() {
                 borderBottom: "1px solid #eee",
                 display: "flex",
                 justifyContent: "space-between",
-                alignItems: "center",
+                alignItems: "center"
               }}
             >
               <h2 style={{ margin: 0 }}>{selectedSong.title}</h2>
@@ -616,7 +671,9 @@ export default function SongsPage() {
               </p>
               <p>
                 <strong>아티스트:</strong>{" "}
-                {selectedSong.artistName || "Unknown"}
+                {selectedSong.artistName ||
+                  artistNameById.get(selectedSong.artistId) ||
+                  "Unknown"}
               </p>
             </div>
 
@@ -645,7 +702,12 @@ export default function SongsPage() {
                         >
                           <td style={{ padding: 8 }}>{chart.year}</td>
                           <td style={{ padding: 8 }}>{chart.week}</td>
-                          <td style={{ padding: 8 }}>#{chart.chartRank}</td>
+                          <td style={{ padding: 8 }}>
+                            #
+                            {chart.chartRank != null
+                              ? chart.chartRank
+                              : chart.rank}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -670,7 +732,7 @@ export default function SongsPage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 1000,
+            zIndex: 1000
           }}
           onClick={handleClosePlaylistModal}
         >
@@ -682,7 +744,7 @@ export default function SongsPage() {
               maxWidth: 400,
               maxHeight: "80vh",
               overflow: "auto",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -707,7 +769,7 @@ export default function SongsPage() {
                   padding: 0,
                   margin: 0,
                   border: "1px solid #eee",
-                  borderRadius: 4,
+                  borderRadius: 4
                 }}
               >
                 {myPlaylists.map((pl, idx) => (
@@ -721,7 +783,7 @@ export default function SongsPage() {
                       padding: 12,
                       cursor: "pointer",
                       background: "#fff",
-                      transition: "background 0.2s",
+                      transition: "background 0.2s"
                     }}
                     onMouseEnter={(e) =>
                       (e.currentTarget.style.background = "#f5f5f5")
@@ -737,7 +799,7 @@ export default function SongsPage() {
                         style={{
                           margin: "4px 0 0 0",
                           fontSize: "0.9em",
-                          color: "#666",
+                          color: "#666"
                         }}
                       >
                         {pl.note}

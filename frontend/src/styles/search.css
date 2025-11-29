@@ -1,0 +1,238 @@
+/* 검색 페이지 전체 */
+.search-page {
+  padding-top: 8px;
+}
+
+/* 상단 검색 헤더 */
+.search-header {
+  margin-bottom: 20px;
+}
+
+.search-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.search-input {
+  flex: 1;
+  border-radius: 999px;
+  border: 2px solid #f472b6;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.search-button {
+  border-radius: 999px;
+  padding: 0 18px;
+  border: none;
+  background: linear-gradient(90deg, #ec4899, #6366f1);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.search-tabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.search-tab {
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.search-tab.active {
+  color: #16a34a;
+  border-bottom: 2px solid #16a34a;
+}
+
+/* 공통 섹션 */
+.search-section {
+  margin-top: 24px;
+}
+
+.search-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+/* 곡 테이블 */
+.search-song-table th,
+.search-song-table td {
+  font-size: 13px;
+}
+
+.search-song-row:hover {
+  background-color: #f8fafc;
+}
+
+.search-song-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-start;
+}
+
+.btn-icon.play-btn {
+  border-radius: 999px;
+  width: 26px;
+  height: 26px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* 아티스트 리스트 */
+.search-artist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.search-artist-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 4px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.search-artist-thumb {
+  margin-right: 10px;
+}
+
+.search-artist-main {
+  flex: 1;
+}
+
+.search-artist-actions {
+  margin-left: 8px;
+}
+
+/* 앨범 리스트 */
+.search-album-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.search-album-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 4px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.search-album-thumb {
+  margin-right: 10px;
+}
+
+.album-cover--tiny {
+  width: 40px;
+  height: 40px;
+  padding-top: 0;
+}
+
+.search-album-main {
+  display: flex;
+  flex-direction: column;
+}
+
+.search-album-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.search-album-meta {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.search-album-year {
+  margin-left: 4px;
+}
+
+/* 검색 페이지 전체는 담백한 흰/회색 톤 */
+.content-page.search-page {
+  background: #f3f4f6; /* 연회색 */
+  padding-top: 16px;
+}
+
+.search-page .content-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+}
+
+/* 검색 상단 박스 */
+.search-header {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px 20px 12px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+/* 섹션(곡/아티스트/앨범 결과) 카드 */
+.search-section {
+  margin-top: 20px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px 20px 20px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+/* 곡 테이블 줄 배경 – 그라데이션 제거 */
+.search-song-table tbody tr {
+  background: #ffffff;
+}
+
+.search-song-table tbody tr:nth-child(even) {
+  background: #faf5ff; /* 아주 옅은 보라톤, 싫으면 #f9fafb 로 */
+}
+
+.search-artist-row .artist-meta {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px; /* 숫자와 "명" 사이 간격 */
+}
+
+.album-cover {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.album-cover--md {
+  width: 80px;
+  height: 80px;
+}
+
+.album-cover--lg {
+  width: 120px;
+  height: 120px;
+}
+
+.album-cover-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #e845ac, #9b4de3);
+  opacity: 0.85;
+}
+
+.album-cover-initial {
+  position: relative;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+}

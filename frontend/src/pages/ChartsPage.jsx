@@ -1,9 +1,11 @@
 // frontend/src/pages/ChartsPage.jsx
 import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";  
 import { fetchJson } from "../lib/http";
 import HeartIcon from "../components/HeartIcon";
 
 export default function ChartsPage() {
+  const { year: yearParam } = useParams(); 
   const [periods, setPeriods] = useState([]);
   const [selectedYear, setSelectedYear] = useState(null);
   const [selectedWeek, setSelectedWeek] = useState(null);
@@ -51,6 +53,17 @@ export default function ChartsPage() {
       }
     })();
   }, []);
+ /* -------------------------------------------------------------------------- */
+    // URL 파라미터 year로 진입했을 때 → 바로 연도별 TOP 보기
+ /* -------------------------------------------------------------------------- */
+  useEffect(() => {
+    if (!yearParam) return;
+    const y = Number(yearParam);
+    if (Number.isNaN(y)) return;
+
+    setSelectedYearForTop(y);
+    setViewMode("yearly");   // ✅ 바로 연도별 화면으로
+  }, [yearParam]);
 
   /* -------------------------------------------------------------------------- */
   /*  선택된 기간의 차트 데이터 가져오기                                       */

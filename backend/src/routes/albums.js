@@ -4,6 +4,20 @@ import * as db from "../store/db.mysql.js";
 
 const router = Router();
 
+
+/** 🔍 GET /albums/search?q=키워드 */
+router.get("/search", async (req, res, next) => {
+  try {
+    const q = (req.query.q || "").toString().trim();
+    if (!q) return res.json({ albums: [] });
+
+    const albums = await db.searchAlbums({ q });
+    res.json({ albums });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /albums
 router.get("/", async (req, res, next) => {
   try {
